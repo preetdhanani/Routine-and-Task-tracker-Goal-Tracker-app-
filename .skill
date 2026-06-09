@@ -1,0 +1,27 @@
+---
+name: git-push
+description: Automates staging, committing, and pushing changes to a remote Git repository using only the repository link and branch name.
+keyword: "git push"
+---
+
+# Git Push Skill
+
+This skill automates the process of pushing local codebase changes to a remote repository. When the keyword `git push` is detected, the agent should automatically stage, commit, and push changes.
+
+## Inputs
+- **repo_link** (string): The remote Git repository URL (e.g., `https://github.com/username/repo.git`).
+- **branch_name** (string): The target branch name (e.g., `main`).
+
+## Implementation Steps
+1. Stage all modifications and new files:
+   ```bash
+   git add .
+   ```
+2. Commit the changes with an automated commit message describing the updates:
+   ```bash
+   git commit -m "Automated push via git-push skill"
+   ```
+3. Push the commits to the specified remote repository and branch:
+   ```bash
+   git push <repo_link> <branch_name>
+   ```
