@@ -4,10 +4,10 @@ import React, { useState } from 'react';
 import { useStore } from '../store/useStore';
 import { supabase } from '../lib/supabase';
 import styles from './AuthSection.module.css';
-import { Compass, LogIn, Sparkles, AlertCircle, Check } from 'lucide-react';
+import { Compass, Sparkles, AlertCircle, Check } from 'lucide-react';
 
 export default function AuthSection() {
-  const { setGuestMode, setUser } = useStore();
+  const { setUser } = useStore();
   const [email, setEmail] = useState('');
   const [token, setToken] = useState('');
   const [otpSent, setOtpSent] = useState(false);
@@ -109,9 +109,9 @@ export default function AuthSection() {
         {/* Warning if Supabase is offline/unconfigured */}
         {!supabase && (
           <div className={styles.warningBanner}>
-            <div className={styles.warningTitle}>Developer Note</div>
+            <div className={styles.warningTitle}>Configuration Required</div>
             <p className={styles.warningText}>
-              Supabase key/URL environment variables are not set. You can run the application immediately in **Guest Mode** (all data saved locally).
+              Supabase environment variables are missing. Please configure `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in your settings to enable authentication.
             </p>
           </div>
         )}
@@ -193,12 +193,7 @@ export default function AuthSection() {
           </>
         ) : null}
 
-        <div className={styles.guestSection}>
-          <button onClick={() => setGuestMode(true)} className={styles.guestBtn}>
-            <LogIn size={16} style={{ marginRight: '8px', display: 'inline' }} />
-            Enter with Guest / Developer Mode
-          </button>
-        </div>
+
       </div>
     </div>
   );
