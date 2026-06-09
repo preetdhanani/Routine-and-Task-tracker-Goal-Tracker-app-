@@ -66,11 +66,25 @@ export default function Dashboard() {
       case 'routines':
         return <RoutinesSection />;
       case 'tasks':
-        return <TasksSection />;
+        return (
+          <TasksSection 
+            onStopTimer={() => {
+              setTimerNote('');
+              setShowStopModal(true);
+            }} 
+          />
+        );
       case 'analytics':
         return <AnalyticsSection />;
       default:
-        return <TasksSection />;
+        return (
+          <TasksSection 
+            onStopTimer={() => {
+              setTimerNote('');
+              setShowStopModal(true);
+            }} 
+          />
+        );
     }
   };
 

@@ -49,7 +49,34 @@ const dailyQuotes = [
   { text: "It's not that I'm so smart, it's just that I stay with problems longer.", author: "Albert Einstein", book: "Autobiographical Notes" }
 ];
 
-export default function TasksSection() {
+const CardTimerDisplay = ({ startedAt }: { startedAt: string }) => {
+  const [elapsed, setElapsed] = useState('');
+
+  useEffect(() => {
+    const update = () => {
+      const diff = Math.max(0, Math.round((Date.now() - new Date(startedAt).getTime()) / 1000));
+      const hrs = Math.floor(diff / 3600);
+      const mins = Math.floor((diff % 3600) / 60);
+      const secs = diff % 60;
+      const formatted = [hrs, mins, secs]
+        .map((v) => String(v).padStart(2, '0'))
+        .join(':');
+      setElapsed(formatted);
+    };
+    
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, [startedAt]);
+
+  return <span style={{ color: 'var(--color-danger)', fontWeight: 700 }}>⏱️ {elapsed}</span>;
+};
+
+interface TasksSectionProps {
+  onStopTimer?: () => void;
+}
+
+export default function TasksSection({ onStopTimer }: TasksSectionProps) {
   const {
     tasks,
     subtasks,
@@ -67,6 +94,7 @@ export default function TasksSection() {
     startTimer,
     discardTimer,
     addManualTimeLog,
+    deleteTimeLog,
   } = useStore();
 
   // Collapsible Task Creation Form
@@ -519,7 +547,11 @@ export default function TasksSection() {
                             Checklist: {completedSubtasks}/{taskSubtasks.length}
                           </span>
                         )}
-                        <span>Tracked: {getTaskTotalTime(task.id)}</span>
+                        {isTicking ? (
+                          <CardTimerDisplay startedAt={activeTimer.startedAt} />
+                        ) : (
+                          <span>Tracked: {getTaskTotalTime(task.id)}</span>
+                        )}
                       </div>
                     )}
                   </div>
@@ -540,9 +572,18 @@ export default function TasksSection() {
                     </select>
 
                     {isTicking ? (
-                      <div className={styles.stopBtn} title="Timer running! Control from floating HUD." onClick={(e) => e.stopPropagation()}>
+                      <button
+                        className={styles.stopBtn}
+                        title="Stop Timer"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onStopTimer) {
+                            onStopTimer();
+                          }
+                        }}
+                      >
                         <Square size={12} fill="currentColor" style={{ animation: 'pulse 1s infinite' }} />
-                      </div>
+                      </button>
                     ) : (
                       <button
                         onClick={(e) => handleStartTimer(task.id, e)}
@@ -607,11 +648,61 @@ export default function TasksSection() {
                     </form>
                   </div>
 
+                  {/* Time Logs List */}
+                  {taskTimeLogs.filter((log) => log.task_id === task.id).length > 0 && (
+                    <div className={styles.timeLogsContainer}>
+                      <div className={styles.sectionLabel}>Time Logging History</div>
+                      <div className={styles.timeLogsList}>
+                        {taskTimeLogs
+                          .filter((log) => log.task_id === task.id)
+                          .map((log) => {
+                            const date = new Date(log.started_at).toLocaleDateString([], {
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            });
+                            const hrs = Math.floor(log.duration_seconds / 3600);
+                            const mins = Math.floor((log.duration_seconds % 3600) / 60);
+                            const durationStr = hrs > 0 ? `${hrs}h ${mins}m` : `${mins}m`;
+
+                            return (
+                              <div key={log.id} className={styles.timeLogItem}>
+                                <div className={styles.timeLogMain}>
+                                  <span className={styles.timeLogDuration}>{durationStr}</span>
+                                  <span className={styles.timeLogDate}>{date}</span>
+                                  {log.description && (
+                                    <p className={styles.timeLogNote}>{log.description}</p>
+                                  )}
+                                </div>
+                                <button
+                                  onClick={() => deleteTimeLog(log.id)}
+                                  className={styles.timeLogDeleteBtn}
+                                  title="Delete Time Log"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
+                            );
+                          })}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Footer actions for expanded card */}
                   <div className={styles.timeLogsSummary}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <span>Total Time Logged:</span>
-                      <span className={styles.timeDuration}>{getTaskTotalTime(task.id)}</span>
+                      {isTicking ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span className={styles.timeDuration}>{getTaskTotalTime(task.id)}</span>
+                          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>(running:</span>
+                          <CardTimerDisplay startedAt={activeTimer.startedAt} />
+                          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>)</span>
+                        </div>
+                      ) : (
+                        <span className={styles.timeDuration}>{getTaskTotalTime(task.id)}</span>
+                      )}
                       <button onClick={(e) => handleOpenManualLog(task, e)} className={styles.manualLogBtn}>
                         + Add Manual Log
                       </button>
