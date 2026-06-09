@@ -14,8 +14,9 @@
   overflow-y: auto;
   position: relative;
   padding: 24px;
-  padding-bottom: calc(var(--nav-height) + 24px); /* Extra spacing on mobile for bottom nav */
+  padding-bottom: calc(var(--nav-height) + 90px); /* Extra spacing on mobile for bottom nav and floating FAB */
 }
+
 
 /* Tab contents padding adjustments */
 .tabContainer {

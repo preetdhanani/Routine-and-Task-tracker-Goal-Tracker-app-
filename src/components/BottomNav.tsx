@@ -4,15 +4,14 @@ import React from 'react';
 import { useStore } from '../store/useStore';
 import { supabase } from '../lib/supabase';
 import styles from './BottomNav.module.css';
-import { CheckSquare, Clock, BarChart2, LogOut, Sparkles } from 'lucide-react';
+import { CheckSquare, Clock, BarChart2, LogOut } from 'lucide-react';
 
 interface BottomNavProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
-  onAiChatClick: () => void;
 }
 
-export default function BottomNav({ activeTab, setActiveTab, onAiChatClick }: BottomNavProps) {
+export default function BottomNav({ activeTab, setActiveTab }: BottomNavProps) {
   const { setUser, setGuestMode, clearLocalData } = useStore();
 
   const handleLogout = async () => {
@@ -50,14 +49,6 @@ export default function BottomNav({ activeTab, setActiveTab, onAiChatClick }: Bo
         Analytics
       </button>
 
-      <button
-        onClick={onAiChatClick}
-        className={styles.navItem}
-      >
-        <Sparkles size={20} />
-        AI Chat
-      </button>
-
       <button onClick={handleLogout} className={styles.logoutBtn} title="Sign Out">
         <LogOut size={20} />
         Sign Out
@@ -65,3 +56,4 @@ export default function BottomNav({ activeTab, setActiveTab, onAiChatClick }: Bo
     </nav>
   );
 }
+

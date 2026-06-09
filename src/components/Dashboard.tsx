@@ -268,7 +268,7 @@ export default function Dashboard() {
       )}
 
       {/* Bottom Nav - Mobile */}
-      <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} onAiChatClick={() => setIsAiChatOpen(true)} />
+      <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
     </div>
   );
 }
