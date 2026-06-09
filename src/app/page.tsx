@@ -5,6 +5,7 @@ import { useStore } from '../store/useStore';
 import { supabase } from '../lib/supabase';
 import AuthSection from '../components/AuthSection';
 import Dashboard from '../components/Dashboard';
+import OnboardingSection from '../components/OnboardingSection';
 
 // Custom hook to ensure Zustand store hydration has completed on the client
 function useHasHydrated() {
@@ -42,6 +43,9 @@ export default function Home() {
         setUser({
           id: session.user.id,
           email: session.user.email || '',
+          username: session.user.user_metadata?.username || session.user.user_metadata?.full_name || session.user.user_metadata?.name || '',
+          birthdate: session.user.user_metadata?.birthdate || '',
+          avatarUrl: session.user.user_metadata?.avatar_url || '',
         });
       } else {
         setUser(null);
@@ -54,6 +58,9 @@ export default function Home() {
         setUser({
           id: session.user.id,
           email: session.user.email || '',
+          username: session.user.user_metadata?.username || session.user.user_metadata?.full_name || session.user.user_metadata?.name || '',
+          birthdate: session.user.user_metadata?.birthdate || '',
+          avatarUrl: session.user.user_metadata?.avatar_url || '',
         });
       } else {
         setUser(null);
@@ -74,6 +81,12 @@ export default function Home() {
 
   // Display workspace if logged in or using Guest Mode, otherwise show Auth screen
   if (user || isGuestMode) {
+    const isProfileIncomplete = user && !isGuestMode && (!user.username || !user.birthdate);
+    
+    if (isProfileIncomplete) {
+      return <OnboardingSection />;
+    }
+    
     return <Dashboard />;
   }
 

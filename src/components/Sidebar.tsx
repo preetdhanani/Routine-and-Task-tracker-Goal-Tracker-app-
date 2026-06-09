@@ -14,6 +14,26 @@ interface SidebarProps {
 export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
   const { user, isGuestMode, syncQueue, isSyncing, isOnline, setUser, setGuestMode, clearLocalData } = useStore();
 
+  const getAvatarInitials = () => {
+    if (isGuestMode) return 'G';
+    if (user?.username) return user.username.charAt(0).toUpperCase();
+    if (user?.email) return user.email.charAt(0).toUpperCase();
+    return 'U';
+  };
+
+  const getDisplayName = () => {
+    if (isGuestMode) return 'Guest User';
+    return user?.username || user?.email || 'User';
+  };
+
+  const getDisplaySubtitle = () => {
+    if (isGuestMode) return 'Offline Sandbox';
+    if (user?.birthdate) {
+      return `🎂 ${user.birthdate}`;
+    }
+    return 'Cloud Synchronized';
+  };
+
   const handleLogout = async () => {
     if (supabase) {
       await supabase.auth.signOut();
@@ -81,13 +101,30 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
         )}
 
         <div className={styles.userInfo}>
-          <div className={styles.userDetails}>
-            <span className={styles.userName}>
-              {isGuestMode ? 'Guest Mode' : user?.email || 'User'}
-            </span>
-            <span className={styles.userRole}>
-              {isGuestMode ? 'Offline Sandbox' : 'Cloud Synchronized'}
-            </span>
+          <div className={styles.userProfileWrapper}>
+            {user?.avatarUrl && !isGuestMode ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img 
+                src={user.avatarUrl} 
+                alt="Avatar" 
+                className={styles.avatarImage} 
+                onError={(e) => {
+                  (e.target as HTMLElement).style.display = 'none';
+                }}
+              />
+            ) : (
+              <div className={styles.avatarFallback}>
+                {getAvatarInitials()}
+              </div>
+            )}
+            <div className={styles.userDetails}>
+              <span className={styles.userName} title={getDisplayName()}>
+                {getDisplayName()}
+              </span>
+              <span className={styles.userRole}>
+                {getDisplaySubtitle()}
+              </span>
+            </div>
           </div>
           <button onClick={handleLogout} className={styles.logoutBtn} title="Sign Out">
             <LogOut size={16} />

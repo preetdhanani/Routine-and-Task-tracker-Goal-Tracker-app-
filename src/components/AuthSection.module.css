@@ -195,16 +195,31 @@
   line-height: 1.4;
 }
 
-.successText {
+.messageBanner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
   font-size: 13px;
-  color: var(--color-success);
-  margin-top: 8px;
-  text-align: center;
+  text-align: left;
+  line-height: 1.4;
+  margin-top: 16px;
+  width: 100%;
 }
 
-.errorText {
-  font-size: 13px;
+.successBanner {
+  background-color: var(--color-success-light);
+  border: 1px solid rgba(16, 185, 129, 0.15);
+  color: var(--color-success);
+}
+
+.errorBanner {
+  background-color: var(--color-danger-light);
+  border: 1px solid rgba(239, 68, 68, 0.15);
   color: var(--color-danger);
-  margin-top: 8px;
-  text-align: center;
+}
+
+.messageIcon {
+  flex-shrink: 0;
 }

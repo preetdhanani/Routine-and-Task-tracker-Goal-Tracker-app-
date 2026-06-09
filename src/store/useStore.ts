@@ -87,9 +87,12 @@ export interface ChatThread {
   created_at: string;
 }
 
-interface UserProfile {
+export interface UserProfile {
   id: string;
   email: string;
+  username?: string;
+  birthdate?: string;
+  avatarUrl?: string;
 }
 
 interface GoalTrackerState {

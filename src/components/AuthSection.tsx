@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useStore } from '../store/useStore';
 import { supabase } from '../lib/supabase';
 import styles from './AuthSection.module.css';
-import { Compass, LogIn, Sparkles } from 'lucide-react';
+import { Compass, LogIn, Sparkles, AlertCircle, Check } from 'lucide-react';
 
 export default function AuthSection() {
   const { setGuestMode, setUser } = useStore();
@@ -172,9 +172,14 @@ export default function AuthSection() {
             )}
 
             {message && (
-              <p className={message.type === 'success' ? styles.successText : styles.errorText}>
-                {message.text}
-              </p>
+              <div className={`${styles.messageBanner} ${message.type === 'success' ? styles.successBanner : styles.errorBanner}`}>
+                {message.type === 'success' ? (
+                  <Check size={16} className={styles.messageIcon} />
+                ) : (
+                  <AlertCircle size={16} className={styles.messageIcon} />
+                )}
+                <span>{message.text}</span>
+              </div>
             )}
 
             <div className={styles.divider}>
