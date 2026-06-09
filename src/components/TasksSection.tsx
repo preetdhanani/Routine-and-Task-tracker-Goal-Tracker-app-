@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useStore, Task } from '../store/useStore';
 import styles from './TasksSection.module.css';
 import { Play, Square, Plus, Trash2, Check, ChevronDown, ChevronUp, X } from 'lucide-react';
@@ -86,13 +86,39 @@ export default function TasksSection() {
   const [goalDescription, setGoalDescription] = useState('');
   const [goalTargetDate, setGoalTargetDate] = useState('');
 
-  // Get date-based index for daily quote selector (stable across renders in a single day)
+  // Local date tracker that updates at midnight to roll over the quote
+  const [currentDateStr, setCurrentDateStr] = useState(() => {
+    return new Date().toLocaleDateString('sv');
+  });
+
+  useEffect(() => {
+    let timeoutId: ReturnType<typeof setTimeout>;
+    const scheduleMidnightUpdate = () => {
+      const now = new Date();
+      // Calculate next midnight in local timezone
+      const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+      const msUntilMidnight = tomorrow.getTime() - now.getTime();
+      
+      timeoutId = setTimeout(() => {
+        setCurrentDateStr(new Date().toLocaleDateString('sv'));
+        scheduleMidnightUpdate();
+      }, msUntilMidnight + 100); // add 100ms buffer to ensure rollover
+    };
+    
+    scheduleMidnightUpdate();
+    return () => clearTimeout(timeoutId);
+  }, []);
+
+  // Get date-based index for daily quote selector (stable across renders in a single day, updates at midnight)
   const dailyQuote = useMemo(() => {
+    // Reference currentDateStr to trigger recalculation on day rollover
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const _dateTrigger = currentDateStr;
     const today = new Date();
     const hash = (today.getFullYear() * 37) + (today.getMonth() * 7) + today.getDate();
     const index = hash % dailyQuotes.length;
     return dailyQuotes[index];
-  }, []);
+  }, [currentDateStr]);
   
   // Accordion card expansion
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);

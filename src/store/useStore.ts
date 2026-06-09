@@ -723,14 +723,34 @@ export const useStore = create<GoalTrackerState>()(
             }
 
             if (error) {
-              console.error(`Error syncing action ${action.id} to ${table}:`, error);
+              const isNetworkError = error.message && (
+                error.message.includes('Failed to fetch') || 
+                error.message.includes('NetworkError') ||
+                error.message.includes('fetch')
+              );
+              
+              if (isNetworkError) {
+                console.warn(`Sync paused: network connection is currently unreachable (${error.message}). Will retry when connection stabilizes.`);
+              } else {
+                console.error(`Error syncing action ${action.id} to ${table}:`, error.message, error.details, error.hint || '');
+              }
               // Stop processing on error to preserve order (KISS transaction safety)
               break;
             }
 
             processedCount++;
           } catch (err) {
-            console.error('Failed to sync action due to connection exception:', err);
+            const isNetworkError = err instanceof Error && (
+              err.message.includes('Failed to fetch') || 
+              err.message.includes('NetworkError') ||
+              err.message.includes('fetch')
+            );
+            
+            if (isNetworkError) {
+              console.warn(`Sync paused: network connection is currently unreachable (${err.message}). Will retry when connection stabilizes.`);
+            } else {
+              console.error('Failed to sync action due to connection exception:', err);
+            }
             break;
           }
         }
