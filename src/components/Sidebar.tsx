@@ -28,9 +28,6 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
 
   const getDisplaySubtitle = () => {
     if (isGuestMode) return 'Offline Sandbox';
-    if (user?.birthdate) {
-      return `🎂 ${user.birthdate}`;
-    }
     return 'Cloud Synchronized';
   };
 

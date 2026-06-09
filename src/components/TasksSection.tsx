@@ -69,7 +69,7 @@ const CardTimerDisplay = ({ startedAt }: { startedAt: string }) => {
     return () => clearInterval(interval);
   }, [startedAt]);
 
-  return <span style={{ color: 'var(--color-danger)', fontWeight: 700 }}>⏱️ {elapsed}</span>;
+  return <span style={{ color: 'var(--color-danger)', fontWeight: 700 }}>{elapsed}</span>;
 };
 
 interface TasksSectionProps {
