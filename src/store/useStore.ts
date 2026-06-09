@@ -1,0 +1,1471 @@
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+import { supabase } from '../lib/supabase';
+
+// --- Type Definitions ---
+export interface Routine {
+  id: string;
+  user_id?: string;
+  title: string;
+  category: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface RoutineLog {
+  id: string;
+  routine_id: string;
+  user_id?: string;
+  completed_date: string; // YYYY-MM-DD
+  created_at: string;
+}
+
+export interface Task {
+  id: string;
+  user_id?: string;
+  title: string;
+  description: string;
+  status: 'todo' | 'in_progress' | 'completed';
+  created_at: string;
+  dueDate?: string; // YYYY-MM-DD
+  priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+}
+
+export interface Goal {
+  id: string;
+  user_id?: string;
+  title: string;
+  description: string;
+  target_date?: string; // YYYY-MM-DD
+  created_at: string;
+}
+
+export interface Subtask {
+  id: string;
+  task_id: string;
+  title: string;
+  is_completed: boolean;
+  created_at: string;
+}
+
+export interface TaskTimeLog {
+  id: string;
+  task_id: string;
+  user_id?: string;
+  started_at: string;
+  ended_at: string;
+  duration_seconds: number;
+  description: string;
+  created_at: string;
+}
+
+export interface SyncAction {
+  id: string;
+  action: 'insert' | 'update' | 'delete';
+  table: 'routines' | 'routine_logs' | 'tasks' | 'task_subtasks' | 'task_time_logs' | 'chat_threads' | 'chat_messages' | 'goals';
+  payload: any; // eslint-disable-line @typescript-eslint/no-explicit-any
+}
+
+export interface AgentChatMessage {
+  id: string;
+  sender: 'user' | 'agent';
+  text: string;
+  timestamp: string;
+  model?: string;
+  tokenUsage?: {
+    input: number;
+    output: number;
+    reasoning: number;
+    total: number;
+  } | null;
+}
+
+export interface ChatThread {
+  id: string;
+  title: string;
+  messages: AgentChatMessage[];
+  created_at: string;
+}
+
+interface UserProfile {
+  id: string;
+  email: string;
+}
+
+interface GoalTrackerState {
+  user: UserProfile | null;
+  isGuestMode: boolean;
+  routines: Routine[];
+  routineLogs: RoutineLog[];
+  tasks: Task[];
+  subtasks: Subtask[];
+  taskTimeLogs: TaskTimeLog[];
+  goals: Goal[];
+  activeTimer: { taskId: string; startedAt: string } | null;
+  syncQueue: SyncAction[];
+  isSyncing: boolean;
+  isOnline: boolean;
+
+  // Actions
+  setUser: (user: UserProfile | null) => void;
+  setGuestMode: (enabled: boolean) => void;
+  setOnline: (online: boolean) => void;
+  
+  // Routine Actions
+  addRoutine: (title: string, category: string) => void;
+  toggleRoutine: (routineId: string, dateStr: string) => void;
+  deleteRoutine: (routineId: string) => void;
+  updateRoutine: (routineId: string, title: string) => void;
+  
+  // Task Actions
+  addTask: (title: string, description: string, dueDate?: string, priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL', subtaskTitles?: string[]) => void;
+  updateTaskStatus: (taskId: string, status: 'todo' | 'in_progress' | 'completed') => void;
+  updateTask: (taskId: string, updates: Partial<Omit<Task, 'id' | 'created_at' | 'user_id'>>) => void;
+  deleteTask: (taskId: string) => void;
+  
+  // Subtask Actions
+  addSubtask: (taskId: string, title: string) => void;
+  toggleSubtask: (subtaskId: string) => void;
+  deleteSubtask: (subtaskId: string) => void;
+
+  // Goal Actions
+  addGoal: (title: string, description: string, targetDate?: string) => void;
+  deleteGoal: (goalId: string) => void;
+  
+  // Timer Actions
+  startTimer: (taskId: string) => void;
+  stopTimer: (description: string) => void;
+  discardTimer: () => void;
+  addManualTimeLog: (taskId: string, durationSeconds: number, description: string, startedAt: string) => void;
+  deleteTimeLog: (logId: string) => void;
+
+  // Sync Logic
+  processSyncQueue: () => Promise<void>;
+  clearLocalData: () => void;
+
+  // Chat History Observability Actions
+  chatThreads: ChatThread[];
+  activeThreadId: string | null;
+  createNewThread: () => void;
+  deleteThread: (threadId: string) => void;
+  setActiveThreadId: (threadId: string) => void;
+  addMessageToActiveThread: (message: Omit<AgentChatMessage, 'timestamp'>) => void;
+  updateActiveThreadTokenUsage: (usage: NonNullable<AgentChatMessage['tokenUsage']>) => void;
+  isAiResponding: boolean;
+  abortController: AbortController | null;
+  cancelAgentMessage: () => void;
+  aiFeedback: string[];
+  clearAiFeedback: () => void;
+  sendAgentMessage: (text: string, apiKey: string) => Promise<void>;
+  fetchUserData: () => Promise<void>;
+  selectedModel: string;
+  setSelectedModel: (model: string) => void;
+}
+
+// --- Helper: Generate Mock Data for First Load ---
+const getPastDateString = (daysAgo: number): string => {
+  const d = new Date();
+  d.setDate(d.getDate() - daysAgo);
+  return d.toISOString().split('T')[0];
+};
+
+const initialMockRoutines: Routine[] = [
+  { id: 'm-r1', title: 'Drink 3L Water', category: 'Health', is_active: true, created_at: new Date().toISOString() },
+  { id: 'm-r2', title: 'Morning Meditation', category: 'Mindset', is_active: true, created_at: new Date().toISOString() },
+  { id: 'm-r3', title: 'Read 20 Pages', category: 'Learning', is_active: true, created_at: new Date().toISOString() },
+  { id: 'm-r4', title: '15 Mins Cardio Workout', category: 'Fitness', is_active: true, created_at: new Date().toISOString() },
+];
+
+const generateMockRoutineLogs = (): RoutineLog[] => {
+  const logs: RoutineLog[] = [];
+  const routineIds = ['m-r1', 'm-r2', 'm-r3', 'm-r4'];
+  
+  // Generate historical checks for the last 30 days with some random gaps
+  for (let i = 0; i < 30; i++) {
+    const dateStr = getPastDateString(i);
+    routineIds.forEach((rid) => {
+      // 70% chance of completion to make the heatmap look realistic
+      if (Math.random() > 0.3) {
+        logs.push({
+          id: `m-log-${rid}-${dateStr}`,
+          routine_id: rid,
+          completed_date: dateStr,
+          created_at: new Date(dateStr + 'T10:00:00Z').toISOString(),
+        });
+      }
+    });
+  }
+  return logs;
+};
+
+const initialMockTasks: Task[] = [
+  { id: 'm-t1', title: 'Design Glassmorphism Dashboard Layout', description: 'Create responsive grid layouts with CSS modules and clay-white card aesthetics.', status: 'in_progress', created_at: new Date().toISOString() },
+  { id: 'm-t2', title: 'Implement Zustand State with Local Cache', description: 'Define stores, type definitions, and synchronization queues.', status: 'completed', created_at: new Date().toISOString() },
+  { id: 'm-t3', title: 'Connect Supabase Auth & DB tables', description: 'Link Google OAuth, Email OTP magic link, and write action syncing logic.', status: 'todo', created_at: new Date().toISOString() },
+];
+
+const initialMockSubtasks: Subtask[] = [
+  { id: 'm-st1', task_id: 'm-t1', title: 'Write responsive app shell components', is_completed: true, created_at: new Date().toISOString() },
+  { id: 'm-st2', task_id: 'm-t1', title: 'Apply soft porcelain/clay backgrounds', is_completed: false, created_at: new Date().toISOString() },
+  { id: 'm-st3', task_id: 'm-t2', title: 'Configure local storage persistence', is_completed: true, created_at: new Date().toISOString() },
+];
+
+const initialMockTimeLogs = (): TaskTimeLog[] => [
+  {
+    id: 'm-tl1',
+    task_id: 'm-t2',
+    started_at: new Date(Date.now() - 3600000 * 2.5).toISOString(),
+    ended_at: new Date(Date.now() - 3600000 * 0.5).toISOString(),
+    duration_seconds: 7200, // 2 hours
+    description: 'Designed local-first persistence structure and wrote sync actions.',
+    created_at: new Date().toISOString()
+  },
+  {
+    id: 'm-tl2',
+    task_id: 'm-t1',
+    started_at: new Date(Date.now() - 3600000 * 5).toISOString(),
+    ended_at: new Date(Date.now() - 3600000 * 4.5).toISOString(),
+    duration_seconds: 1800, // 30 mins
+    description: 'Experimented with light-theme CSS backdrop-filters.',
+    created_at: new Date().toISOString()
+  }
+];
+
+export const useStore = create<GoalTrackerState>()(
+  persist(
+    (set, get) => ({
+      user: null,
+      isGuestMode: false,
+      routines: initialMockRoutines,
+      routineLogs: generateMockRoutineLogs(),
+      tasks: initialMockTasks,
+      subtasks: initialMockSubtasks,
+      taskTimeLogs: initialMockTimeLogs(),
+      goals: [],
+      activeTimer: null,
+      syncQueue: [],
+      isSyncing: false,
+      isOnline: typeof window !== 'undefined' ? window.navigator.onLine : true,
+
+      // Initial Chat Thread Configuration
+      chatThreads: [
+        {
+          id: 'welcome-thread',
+          title: 'Welcome Chat',
+          messages: [
+            {
+              id: 'welcome-msg',
+              sender: 'agent',
+              text: 'Hello! I am your Goal Tracker AI Assistant. Ask me questions about your history (e.g. "How much did I track today?") or ask me to schedule new habits and tasks (e.g. "Add a work routine: Read mail").',
+              timestamp: new Date().toISOString()
+            }
+          ],
+          created_at: new Date().toISOString()
+        }
+      ],
+      activeThreadId: 'welcome-thread',
+      isAiResponding: false,
+      abortController: null,
+      aiFeedback: [],
+      selectedModel: 'gemini-3.5-flash',
+      setSelectedModel: (model) => set({ selectedModel: model }),
+
+      setUser: (user) => {
+        set({ user, isGuestMode: user ? false : get().isGuestMode });
+        if (user) {
+          get().fetchUserData();
+          get().processSyncQueue();
+        }
+      },
+      setGuestMode: (enabled) => set({ isGuestMode: enabled, user: enabled ? null : get().user }),
+      setOnline: (online) => {
+        set({ isOnline: online });
+        if (online && get().user) {
+          get().processSyncQueue();
+        }
+      },
+
+      // --- Routines Actions ---
+      addRoutine: (title, category) => {
+        const newRoutine: Routine = {
+          id: `r-${crypto.randomUUID()}`,
+          user_id: get().user?.id,
+          title,
+          category,
+          is_active: true,
+          created_at: new Date().toISOString(),
+        };
+
+        set((state) => ({
+          routines: [newRoutine, ...state.routines],
+          syncQueue: state.user
+            ? [...state.syncQueue, { id: crypto.randomUUID(), action: 'insert', table: 'routines', payload: newRoutine }]
+            : state.syncQueue,
+        }));
+
+        get().processSyncQueue();
+      },
+
+      toggleRoutine: (routineId, dateStr) => {
+        set((state) => {
+          const exists = state.routineLogs.find(
+            (log) => log.routine_id === routineId && log.completed_date === dateStr
+          );
+
+          if (exists) {
+            // Remove completion
+            const updatedLogs = state.routineLogs.filter((log) => log.id !== exists.id);
+            return {
+              routineLogs: updatedLogs,
+              syncQueue: state.user
+                ? [...state.syncQueue, { id: crypto.randomUUID(), action: 'delete', table: 'routine_logs', payload: { id: exists.id } }]
+                : state.syncQueue,
+            };
+          } else {
+            // Add completion
+            const newLog: RoutineLog = {
+              id: `rl-${crypto.randomUUID()}`,
+              routine_id: routineId,
+              user_id: state.user?.id,
+              completed_date: dateStr,
+              created_at: new Date().toISOString(),
+            };
+            return {
+              routineLogs: [newLog, ...state.routineLogs],
+              syncQueue: state.user
+                ? [...state.syncQueue, { id: crypto.randomUUID(), action: 'insert', table: 'routine_logs', payload: newLog }]
+                : state.syncQueue,
+            };
+          }
+        });
+
+        get().processSyncQueue();
+      },
+
+      deleteRoutine: (routineId) => {
+        set((state) => ({
+          routines: state.routines.filter((r) => r.id !== routineId),
+          routineLogs: state.routineLogs.filter((log) => log.routine_id !== routineId),
+          syncQueue: state.user
+            ? [...state.syncQueue, { id: crypto.randomUUID(), action: 'delete', table: 'routines', payload: { id: routineId } }]
+            : state.syncQueue,
+        }));
+
+        get().processSyncQueue();
+      },
+
+      updateRoutine: (routineId, title) => {
+        set((state) => ({
+          routines: state.routines.map((r) => (r.id === routineId ? { ...r, title } : r)),
+          syncQueue: state.user
+            ? [...state.syncQueue, { id: crypto.randomUUID(), action: 'update', table: 'routines', payload: { id: routineId, title } } as SyncAction]
+            : state.syncQueue,
+        }));
+
+        get().processSyncQueue();
+      },
+
+      // --- Task Actions ---
+      addTask: (title, description, dueDate, priority, subtaskTitles) => {
+        const taskId = `t-${crypto.randomUUID()}`;
+        const newTask: Task = {
+          id: taskId,
+          user_id: get().user?.id,
+          title,
+          description,
+          status: 'todo',
+          created_at: new Date().toISOString(),
+          dueDate,
+          priority: priority || 'MEDIUM',
+        };
+
+        const subtasksToAdd: Subtask[] = [];
+        const syncQueueToAdd: SyncAction[] = [];
+
+        if (subtaskTitles && subtaskTitles.length > 0) {
+          subtaskTitles.forEach((subTitle) => {
+            const newSubtask: Subtask = {
+              id: `st-${crypto.randomUUID()}`,
+              task_id: taskId,
+              title: subTitle,
+              is_completed: false,
+              created_at: new Date().toISOString(),
+            };
+            subtasksToAdd.push(newSubtask);
+            if (get().user) {
+              syncQueueToAdd.push({ id: crypto.randomUUID(), action: 'insert', table: 'task_subtasks', payload: newSubtask } as SyncAction);
+            }
+          });
+        }
+
+        set((state) => ({
+          tasks: [...state.tasks, newTask],
+          subtasks: [...state.subtasks, ...subtasksToAdd],
+          syncQueue: state.user
+            ? [
+                ...state.syncQueue,
+                { id: crypto.randomUUID(), action: 'insert', table: 'tasks', payload: newTask } as SyncAction,
+                ...syncQueueToAdd
+              ]
+            : state.syncQueue,
+        }));
+
+        get().processSyncQueue();
+      },
+
+      updateTask: (taskId, updates) => {
+        set((state) => {
+          const updatedTasks = state.tasks.map((t) =>
+            t.id === taskId ? { ...t, ...updates } : t
+          );
+          return {
+            tasks: updatedTasks,
+            syncQueue: state.user
+              ? [
+                  ...state.syncQueue,
+                  {
+                    id: crypto.randomUUID(),
+                    action: 'update',
+                    table: 'tasks',
+                    payload: { id: taskId, ...updates }
+                  } as SyncAction
+                ]
+              : state.syncQueue,
+          };
+        });
+
+        get().processSyncQueue();
+      },
+
+      updateTaskStatus: (taskId, status) => {
+        set((state) => {
+          const tasks = state.tasks.map((t) => (t.id === taskId ? { ...t, status } : t));
+          let activeTimer = state.activeTimer;
+          let taskTimeLogs = state.taskTimeLogs;
+          let syncQueue = state.syncQueue;
+
+          // Smart Flow: complete task -> stop timer & save log
+          if (status === 'completed' && activeTimer?.taskId === taskId) {
+            const endedAt = new Date().toISOString();
+            const durationSeconds = Math.round(
+              (new Date(endedAt).getTime() - new Date(activeTimer.startedAt).getTime()) / 1000
+            );
+
+            if (durationSeconds > 0) {
+              const newLog: TaskTimeLog = {
+                id: `tl-${crypto.randomUUID()}`,
+                task_id: taskId,
+                user_id: state.user?.id,
+                started_at: activeTimer.startedAt,
+                ended_at: endedAt,
+                duration_seconds: durationSeconds,
+                description: 'Completed task session',
+                created_at: endedAt,
+              };
+
+              taskTimeLogs = [newLog, ...taskTimeLogs];
+              if (state.user) {
+                syncQueue = [
+                  ...syncQueue,
+                  { id: crypto.randomUUID(), action: 'insert', table: 'task_time_logs', payload: newLog } as SyncAction
+                ];
+              }
+            }
+            activeTimer = null;
+          }
+
+          return {
+            tasks,
+            activeTimer,
+            taskTimeLogs,
+            syncQueue: state.user
+              ? [
+                  ...syncQueue,
+                  { id: crypto.randomUUID(), action: 'update', table: 'tasks', payload: { id: taskId, status } } as SyncAction
+                ]
+              : syncQueue,
+          };
+        });
+
+        get().processSyncQueue();
+      },
+
+      deleteTask: (taskId) => {
+        set((state) => ({
+          tasks: state.tasks.filter((t) => t.id !== taskId),
+          subtasks: state.subtasks.filter((st) => st.task_id !== taskId),
+          taskTimeLogs: state.taskTimeLogs.filter((tl) => tl.task_id !== taskId),
+          activeTimer: state.activeTimer?.taskId === taskId ? null : state.activeTimer,
+          syncQueue: state.user
+            ? [...state.syncQueue, { id: crypto.randomUUID(), action: 'delete', table: 'tasks', payload: { id: taskId } }]
+            : state.syncQueue,
+        }));
+
+        get().processSyncQueue();
+      },
+
+      // --- Subtask Actions ---
+      addSubtask: (taskId, title) => {
+        const newSubtask: Subtask = {
+          id: `st-${crypto.randomUUID()}`,
+          task_id: taskId,
+          title,
+          is_completed: false,
+          created_at: new Date().toISOString(),
+        };
+
+        set((state) => ({
+          subtasks: [...state.subtasks, newSubtask],
+          syncQueue: state.user
+            ? [...state.syncQueue, { id: crypto.randomUUID(), action: 'insert', table: 'task_subtasks', payload: newSubtask }]
+            : state.syncQueue,
+        }));
+
+        get().processSyncQueue();
+      },
+
+      toggleSubtask: (subtaskId) => {
+        set((state) => {
+          const subtask = state.subtasks.find((st) => st.id === subtaskId);
+          if (!subtask) return {};
+          const is_completed = !subtask.is_completed;
+          const subtasks = state.subtasks.map((st) =>
+            st.id === subtaskId ? { ...st, is_completed } : st
+          );
+
+          return {
+            subtasks,
+            syncQueue: state.user
+              ? [...state.syncQueue, { id: crypto.randomUUID(), action: 'update', table: 'task_subtasks', payload: { id: subtaskId, is_completed } }]
+              : state.syncQueue,
+          };
+        });
+
+        get().processSyncQueue();
+      },
+
+      deleteSubtask: (subtaskId) => {
+        set((state) => ({
+          subtasks: state.subtasks.filter((st) => st.id !== subtaskId),
+          syncQueue: state.user
+            ? [...state.syncQueue, { id: crypto.randomUUID(), action: 'delete', table: 'task_subtasks', payload: { id: subtaskId } }]
+            : state.syncQueue,
+        }));
+
+        get().processSyncQueue();
+      },
+
+      // --- Goal Actions ---
+      addGoal: (title, description, targetDate) => {
+        const newGoal: Goal = {
+          id: `g-${crypto.randomUUID()}`,
+          user_id: get().user?.id,
+          title,
+          description,
+          target_date: targetDate,
+          created_at: new Date().toISOString(),
+        };
+
+        set((state) => ({
+          goals: [newGoal, ...state.goals],
+          syncQueue: state.user
+            ? [...state.syncQueue, { id: crypto.randomUUID(), action: 'insert', table: 'goals', payload: newGoal } as SyncAction]
+            : state.syncQueue,
+        }));
+
+        get().processSyncQueue();
+      },
+
+      deleteGoal: (goalId) => {
+        set((state) => ({
+          goals: state.goals.filter((g) => g.id !== goalId),
+          syncQueue: state.user
+            ? [...state.syncQueue, { id: crypto.randomUUID(), action: 'delete', table: 'goals', payload: { id: goalId } } as SyncAction]
+            : state.syncQueue,
+        }));
+
+        get().processSyncQueue();
+      },
+
+      // --- Timer Actions ---
+      startTimer: (taskId) => {
+        // Smart Flow: starting timer updates task to in_progress
+        const currentTask = get().tasks.find((t) => t.id === taskId);
+        
+        set({
+          activeTimer: {
+            taskId,
+            startedAt: new Date().toISOString(),
+          },
+        });
+
+        if (currentTask && currentTask.status === 'todo') {
+          get().updateTaskStatus(taskId, 'in_progress');
+        }
+      },
+
+      stopTimer: (description) => {
+        const { activeTimer, user } = get();
+        if (!activeTimer) return;
+
+        const endedAt = new Date().toISOString();
+        const durationSeconds = Math.round(
+          (new Date(endedAt).getTime() - new Date(activeTimer.startedAt).getTime()) / 1000
+        );
+
+        // Safeguard against sub-second logs
+        if (durationSeconds <= 0) {
+          set({ activeTimer: null });
+          return;
+        }
+
+        const newLog: TaskTimeLog = {
+          id: `tl-${crypto.randomUUID()}`,
+          task_id: activeTimer.taskId,
+          user_id: user?.id,
+          started_at: activeTimer.startedAt,
+          ended_at: endedAt,
+          duration_seconds: durationSeconds,
+          description,
+          created_at: endedAt,
+        };
+
+        set((state) => ({
+          activeTimer: null,
+          taskTimeLogs: [newLog, ...state.taskTimeLogs],
+          syncQueue: state.user
+            ? [...state.syncQueue, { id: crypto.randomUUID(), action: 'insert', table: 'task_time_logs', payload: newLog }]
+            : state.syncQueue,
+        }));
+
+        get().processSyncQueue();
+      },
+
+      discardTimer: () => {
+        set({ activeTimer: null });
+      },
+
+      addManualTimeLog: (taskId, durationSeconds, description, startedAt) => {
+        const endedAt = new Date(new Date(startedAt).getTime() + durationSeconds * 1000).toISOString();
+        
+        const newLog: TaskTimeLog = {
+          id: `tl-${crypto.randomUUID()}`,
+          task_id: taskId,
+          user_id: get().user?.id,
+          started_at: startedAt,
+          ended_at: endedAt,
+          duration_seconds: durationSeconds,
+          description,
+          created_at: endedAt,
+        };
+
+        set((state) => ({
+          taskTimeLogs: [newLog, ...state.taskTimeLogs],
+          syncQueue: state.user
+            ? [...state.syncQueue, { id: crypto.randomUUID(), action: 'insert', table: 'task_time_logs', payload: newLog }]
+            : state.syncQueue,
+        }));
+
+        get().processSyncQueue();
+      },
+
+      deleteTimeLog: (logId) => {
+        set((state) => ({
+          taskTimeLogs: state.taskTimeLogs.filter((tl) => tl.id !== logId),
+          syncQueue: state.user
+            ? [...state.syncQueue, { id: crypto.randomUUID(), action: 'delete', table: 'task_time_logs', payload: { id: logId } }]
+            : state.syncQueue,
+        }));
+
+        get().processSyncQueue();
+      },
+
+      // --- Offline Sync Logic ---
+      processSyncQueue: async () => {
+        const { syncQueue, isSyncing, isOnline, user } = get();
+
+        // Prevent concurrent syncs, or run only if online and authenticated
+        if (isSyncing || !isOnline || !user || !supabase || syncQueue.length === 0) return;
+
+        set({ isSyncing: true });
+
+        const queueCopy = [...syncQueue];
+        let processedCount = 0;
+
+        for (const action of queueCopy) {
+          try {
+            const { table, action: op, payload } = action;
+            let error = null;
+
+            let payloadToSync = payload;
+            if (table === 'tasks') {
+              const { dueDate, ...rest } = payload;
+              payloadToSync = {
+                ...rest,
+              };
+              if (dueDate !== undefined) {
+                payloadToSync.due_date = dueDate || null;
+              }
+            }
+
+            if (op === 'insert') {
+              const { error: err } = await supabase.from(table).insert(payloadToSync);
+              error = err;
+            } else if (op === 'update') {
+              const { error: err } = await supabase.from(table).update(payloadToSync).eq('id', payload.id);
+              error = err;
+            } else if (op === 'delete') {
+              const { error: err } = await supabase.from(table).delete().eq('id', payload.id);
+              error = err;
+            }
+
+            if (error) {
+              console.error(`Error syncing action ${action.id} to ${table}:`, error);
+              // Stop processing on error to preserve order (KISS transaction safety)
+              break;
+            }
+
+            processedCount++;
+          } catch (err) {
+            console.error('Failed to sync action due to connection exception:', err);
+            break;
+          }
+        }
+
+        if (processedCount > 0) {
+          set((state) => ({
+            syncQueue: state.syncQueue.slice(processedCount),
+          }));
+        }
+
+        set({ isSyncing: false });
+      },
+
+      fetchUserData: async () => {
+        const { user, isOnline } = get();
+        if (!user || !isOnline || !supabase) return;
+
+        try {
+          // 1. Fetch routines
+          const { data: routinesData } = await supabase.from('routines').select('*').eq('user_id', user.id);
+          // 2. Fetch routine logs
+          const { data: routineLogsData } = await supabase.from('routine_logs').select('*').eq('user_id', user.id);
+          // 3. Fetch tasks
+          const { data: tasksData } = await supabase.from('tasks').select('*').eq('user_id', user.id);
+          
+          let subtasksData: Subtask[] = [];
+          if (tasksData && tasksData.length > 0) {
+            const taskIds = tasksData.map(t => t.id);
+            const { data: stData } = await supabase.from('task_subtasks').select('*').in('task_id', taskIds);
+            if (stData) subtasksData = stData;
+          }
+          
+          // 4. Fetch time logs
+          const { data: timeLogsData } = await supabase.from('task_time_logs').select('*').eq('user_id', user.id);
+
+          // 5. Fetch chat threads
+          const { data: threadsData } = await supabase.from('chat_threads').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
+
+          // 6. Fetch chat messages
+          const { data: messagesData } = await supabase.from('chat_messages').select('*').eq('user_id', user.id).order('created_at', { ascending: true });
+
+          // Assemble chat threads with their messages
+          const chatThreads: ChatThread[] = [];
+          if (threadsData) {
+            threadsData.forEach((thread: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+              const msgs = messagesData
+                ? messagesData
+                    .filter((m: any) => m.thread_id === thread.id) // eslint-disable-line @typescript-eslint/no-explicit-any
+                    .map((m: any) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
+                      id: m.id,
+                      sender: m.sender,
+                      text: m.text,
+                      timestamp: m.created_at,
+                      tokenUsage: m.token_usage || null
+                    }))
+                : [];
+              chatThreads.push({
+                id: thread.id,
+                title: thread.title,
+                messages: msgs,
+                created_at: thread.created_at
+              });
+            });
+          }
+
+          // 7. Fetch goals
+          const { data: goalsData } = await supabase.from('goals').select('*').eq('user_id', user.id);
+
+          const mappedTasks = (tasksData || []).map((t: any) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
+            id: t.id,
+            user_id: t.user_id,
+            title: t.title,
+            description: t.description,
+            status: t.status,
+            created_at: t.created_at,
+            dueDate: t.due_date || undefined,
+            priority: t.priority || 'MEDIUM',
+          }));
+
+          set({
+            routines: routinesData || [],
+            routineLogs: routineLogsData || [],
+            tasks: mappedTasks,
+            subtasks: subtasksData,
+            taskTimeLogs: timeLogsData || [],
+            goals: goalsData || [],
+            chatThreads: chatThreads.length > 0 ? chatThreads : get().chatThreads,
+            activeThreadId: chatThreads.length > 0 ? chatThreads[0].id : get().activeThreadId
+          });
+        } catch (err) {
+          console.error('Error fetching user data from Supabase:', err);
+        }
+      },
+
+      clearLocalData: () => {
+        set({
+          routines: [],
+          routineLogs: [],
+          tasks: [],
+          subtasks: [],
+          taskTimeLogs: [],
+          goals: [],
+          activeTimer: null,
+          syncQueue: [],
+          chatThreads: [
+            {
+              id: 'welcome-thread',
+              title: 'Welcome Chat',
+              messages: [
+                {
+                  id: 'welcome-msg',
+                  sender: 'agent',
+                  text: 'Hello! I am your Goal Tracker AI Assistant. Ask me questions about your history or ask me to schedule new habits and tasks.',
+                  timestamp: new Date().toISOString()
+                }
+              ],
+              created_at: new Date().toISOString()
+            }
+          ],
+          activeThreadId: 'welcome-thread',
+          isAiResponding: false,
+          aiFeedback: [],
+          selectedModel: 'gemini-3.5-flash',
+        });
+      },
+
+      // --- Chat Thread Persistence Actions ---
+      createNewThread: () => {
+        const newThread: ChatThread = {
+          id: `ch-${crypto.randomUUID()}`,
+          title: 'New Chat',
+          messages: [
+            {
+              id: `welcome-${crypto.randomUUID()}`,
+              sender: 'agent',
+              text: 'Hello! I am your Goal Tracker AI Assistant. Ask me questions about your history or ask me to schedule new habits and tasks.',
+              timestamp: new Date().toISOString()
+            }
+          ],
+          created_at: new Date().toISOString()
+        };
+
+        set((state) => ({
+          chatThreads: [newThread, ...state.chatThreads],
+          activeThreadId: newThread.id,
+          syncQueue: state.user
+            ? [
+                ...state.syncQueue,
+                { id: crypto.randomUUID(), action: 'insert', table: 'chat_threads', payload: { id: newThread.id, user_id: state.user.id, title: newThread.title, created_at: newThread.created_at } } as SyncAction,
+                { id: crypto.randomUUID(), action: 'insert', table: 'chat_messages', payload: { id: newThread.messages[0].id, thread_id: newThread.id, user_id: state.user.id, sender: newThread.messages[0].sender, text: newThread.messages[0].text, created_at: newThread.messages[0].timestamp, token_usage: null } } as SyncAction
+              ]
+            : state.syncQueue
+        }));
+
+        get().processSyncQueue();
+      },
+
+      deleteThread: (threadId) => {
+        set((state) => {
+          const chatThreads = state.chatThreads.filter(t => t.id !== threadId);
+          let activeThreadId = state.activeThreadId;
+          
+          if (activeThreadId === threadId) {
+            activeThreadId = chatThreads.length > 0 ? chatThreads[0].id : null;
+          }
+
+          const syncQueue = state.user
+            ? [...state.syncQueue, { id: crypto.randomUUID(), action: 'delete', table: 'chat_threads', payload: { id: threadId } } as SyncAction]
+            : state.syncQueue;
+
+          if (chatThreads.length === 0) {
+            const autoThread: ChatThread = {
+              id: 'welcome-thread',
+              title: 'Welcome Chat',
+              messages: [
+                {
+                  id: 'welcome-msg',
+                  sender: 'agent',
+                  text: 'Hello! I am your Goal Tracker AI Assistant. Ask me questions about your history or ask me to schedule new habits and tasks.',
+                  timestamp: new Date().toISOString()
+                }
+              ],
+              created_at: new Date().toISOString()
+            };
+            return {
+              chatThreads: [autoThread],
+              activeThreadId: autoThread.id,
+              syncQueue: state.user
+                ? [
+                    ...syncQueue,
+                    { id: crypto.randomUUID(), action: 'insert', table: 'chat_threads', payload: { id: autoThread.id, user_id: state.user.id, title: autoThread.title, created_at: autoThread.created_at } } as SyncAction,
+                    { id: crypto.randomUUID(), action: 'insert', table: 'chat_messages', payload: { id: autoThread.messages[0].id, thread_id: autoThread.id, user_id: state.user.id, sender: autoThread.messages[0].sender, text: autoThread.messages[0].text, created_at: autoThread.messages[0].timestamp, token_usage: null } } as SyncAction
+                  ]
+                : syncQueue
+            };
+          }
+
+          return {
+            chatThreads,
+            activeThreadId,
+            syncQueue
+          };
+        });
+
+        get().processSyncQueue();
+      },
+
+      setActiveThreadId: (threadId) => set({ activeThreadId: threadId }),
+
+      addMessageToActiveThread: (message) => {
+        set((state) => {
+          const activeThreadId = state.activeThreadId;
+          if (!activeThreadId) return {};
+
+          let syncQueue = state.syncQueue;
+          const newMsg: AgentChatMessage = {
+            ...message,
+            timestamp: new Date().toISOString()
+          };
+
+          const chatThreads = state.chatThreads.map((thread) => {
+            if (thread.id === activeThreadId) {
+              let title = thread.title;
+              if (thread.title === 'New Chat' && message.sender === 'user') {
+                title = message.text.length > 22 ? message.text.slice(0, 20) + '...' : message.text;
+                if (state.user) {
+                  syncQueue = [
+                    ...syncQueue,
+                    { id: crypto.randomUUID(), action: 'update', table: 'chat_threads', payload: { id: thread.id, title } } as SyncAction
+                  ];
+                }
+              }
+
+              if (state.user) {
+                syncQueue = [
+                  ...syncQueue,
+                  {
+                    id: crypto.randomUUID(),
+                    action: 'insert',
+                    table: 'chat_messages',
+                    payload: {
+                      id: newMsg.id,
+                      thread_id: thread.id,
+                      user_id: state.user.id,
+                      sender: newMsg.sender,
+                      text: newMsg.text,
+                      created_at: newMsg.timestamp,
+                      token_usage: newMsg.tokenUsage || null
+                    }
+                  } as SyncAction
+                ];
+              }
+
+              return {
+                ...thread,
+                title,
+                messages: [...thread.messages, newMsg]
+              };
+            }
+            return thread;
+          });
+
+          return { chatThreads, syncQueue };
+        });
+
+        get().processSyncQueue();
+      },
+
+      updateActiveThreadTokenUsage: (usage) => {
+        set((state) => {
+          const activeThreadId = state.activeThreadId;
+          if (!activeThreadId) return {};
+
+          let syncQueue = state.syncQueue;
+          const chatThreads = state.chatThreads.map((thread) => {
+            if (thread.id === activeThreadId) {
+              const messages = [...thread.messages];
+              if (messages.length > 0) {
+                const lastIndex = messages.length - 1;
+                const lastMsg = {
+                  ...messages[lastIndex],
+                  tokenUsage: usage
+                };
+                messages[lastIndex] = lastMsg;
+
+                if (state.user) {
+                  syncQueue = [
+                    ...syncQueue,
+                    {
+                      id: crypto.randomUUID(),
+                      action: 'update',
+                      table: 'chat_messages',
+                      payload: {
+                        id: lastMsg.id,
+                        token_usage: usage
+                      }
+                    } as SyncAction
+                  ];
+                }
+              }
+              return { ...thread, messages };
+            }
+            return thread;
+          });
+
+          return { chatThreads, syncQueue };
+        });
+
+        get().processSyncQueue();
+      },
+
+      clearAiFeedback: () => set({ aiFeedback: [] }),
+
+      cancelAgentMessage: () => {
+        const controller = get().abortController;
+        if (controller) {
+          controller.abort();
+        }
+        set({ isAiResponding: false, abortController: null });
+        get().addMessageToActiveThread({
+          id: `cancel-${crypto.randomUUID()}`,
+          sender: 'agent',
+          text: 'Request cancelled.',
+        });
+      },
+
+      sendAgentMessage: async (userMessage, currentApiKey) => {
+        if (!userMessage.trim()) return;
+
+        const controller = new AbortController();
+        set({ abortController: controller, isAiResponding: true, aiFeedback: [] });
+
+        // 1. Add user message to active thread
+        get().addMessageToActiveThread({
+          id: `u-${crypto.randomUUID()}`,
+          sender: 'user',
+          text: userMessage,
+        });
+
+        try {
+          const todayStr = new Date().toLocaleDateString('sv');
+          const routines = get().routines;
+          const routineLogs = get().routineLogs;
+          const tasks = get().tasks;
+          const subtasks = get().subtasks;
+          const taskTimeLogs = get().taskTimeLogs;
+          const goals = get().goals;
+
+          const contextPrompt = `
+You are a helpful Goal Tracker AI assistant acting as an intelligent productivity coach.
+Current date: ${todayStr}
+
+Current User State:
+- Goals List: ${JSON.stringify(goals.map(g => ({ id: g.id, title: g.title, description: g.description, targetDate: g.target_date })))}
+- Daily Routines: ${JSON.stringify(routines.map(r => ({ id: r.id, title: r.title, category: r.category, isActive: r.is_active })))}
+- Daily Routine Completion Logs: ${JSON.stringify(routineLogs)}
+- Tasks list: ${JSON.stringify(tasks.map(t => ({ id: t.id, title: t.title, description: t.description, status: t.status, dueDate: t.dueDate, priority: t.priority })))}
+- Subtasks checklist: ${JSON.stringify(subtasks.map(st => ({ id: st.id, taskId: st.task_id, title: st.title, isCompleted: st.is_completed })))}
+- Task Time Logs: ${JSON.stringify(taskTimeLogs.map(l => {
+            const task = tasks.find(t => t.id === l.task_id);
+            return { taskTitle: task ? task.title : 'Task', durationSecs: l.duration_seconds, note: l.description, date: l.started_at };
+          }))}
+
+You can answer questions about the user's history, goals, tasks, routines, and statistics.
+You can also set up new tasks, goals, routines, subtasks, and log time.
+When giving natural language responses or offering motivation, feel free to draw inspiration from, quote, or explain ancient Hindu wisdom and shlokas from the Mahabharata/Bhagavad Gita (such as Karma Yoga - doing duty without attachment to outcomes) and the Ramayana (such as Valmiki's teachings on enthusiasm and duty).
+
+
+INTENT CLASSIFICATION:
+You must classify the user's intent as one of the following:
+- "CHAT": Standard conversation, asking questions, or responding to general topics.
+- "CREATE_TASK": User requests to create/add a new task.
+- "CREATE_ROUTINE": User requests to create/add a new routine.
+- "CREATE_SUBTASK": User requests to create/add a subtask to an existing task.
+- "CREATE_TIME_LOG": User requests to log time for an existing task.
+- "UPDATE_TASK": User requests to edit/update a task's details, priority, or due date.
+- "DELETE_TASK": User requests to delete a task.
+- "COMPLETE_TASK": User requests to finish or mark a task as completed.
+- "ANALYTICS": User requests analysis, statistics, or summaries of their productivity.
+- "UPDATE_ROUTINE": User requests to rename or update a routine.
+- "DELETE_ROUTINE": User requests to delete a routine.
+- "COMPLETE_SUBTASK": User requests to mark a subtask/milestone as completed.
+- "CREATE_GOAL": User requests to add/create a long-term goal.
+- "MULTI_ACTION": User requests multiple changes in a single query (e.g. creating a task and logging time).
+
+CLARIFICATION & VALIDATION RULES:
+1. Ambiguity Handling: If a user specifies a task name/phrase that matches multiple tasks (e.g. "Add 1 hour to my ML task" when there are "Learn ML", "ML Thesis", and "ML Interview Prep" tasks), or if the user asks to modify/delete/log time for a task and the reference is vague/ambiguous:
+   - DO NOT make assumptions or choose arbitrarily.
+   - DO NOT generate any action objects in the "actions" list (leave it empty: []).
+   - Set "intent" to "CHAT".
+   - Ask the user a clarifying question listing the matches, e.g.: "Which task would you like to log time for: Learn ML or ML Thesis?"
+2. ID Validation:
+   - For all actions on existing entities (UPDATE_TASK, DELETE_TASK, COMPLETE_TASK, CREATE_SUBTASK, CREATE_TIME_LOG, COMPLETE_SUBTASK, UPDATE_ROUTINE, DELETE_ROUTINE), you MUST ensure the targeted entity exists in the user state and use its valid ID from the context.
+   - If the targeted entity does not exist or cannot be resolved, DO NOT generate any action, set the intent to "CHAT", and reply explaining that the entity wasn't found or ask for clarification.
+
+SUPPORTED ACTIONS:
+You can trigger any number of actions in the "actions" array.
+1. Create Task:
+   {
+     "type": "CREATE_TASK",
+     "payload": {
+       "title": "Task Title",
+       "description": "Optional description (do not put subtasks, time logs, priority, or deadline info here)",
+       "dueDate": "YYYY-MM-DD", // Extract relative dates ("today" = ${todayStr}, "tomorrow", "next Monday", or absolute dates)
+       "priority": "LOW" | "MEDIUM" | "HIGH" | "CRITICAL", // Extract priority from urgency keywords. Default to "MEDIUM"
+       "subtasks": ["Subtask 1", "Subtask 2"], // Extract checklist subtasks if mentioned in creation
+       "timeLog": { // If user specifies duration/time allotment (e.g. "for 1 hour")
+         "durationSeconds": 3600,
+         "description": "Optional description"
+       }
+     }
+   }
+2. Create Routine:
+   { "type": "CREATE_ROUTINE", "payload": { "title": "Routine Title", "category": "Health" | "Mindset" | "Fitness" | "Learning" | "Work" } }
+3. Create Subtask:
+   { "type": "CREATE_SUBTASK", "payload": { "taskId": "Existing Task ID", "title": "Subtask Title" } }
+4. Create Time Log:
+   { "type": "CREATE_TIME_LOG", "payload": { "taskId": "Existing Task ID", "durationSeconds": 3600, "description": "Optional note" } }
+5. Update Task:
+   { "type": "UPDATE_TASK", "payload": { "taskId": "Existing Task ID", "title": "New Title", "description": "New Description", "dueDate": "YYYY-MM-DD", "priority": "LOW" | "MEDIUM" | "HIGH" | "CRITICAL" } }
+6. Delete Task:
+   { "type": "DELETE_TASK", "payload": { "taskId": "Existing Task ID" } }
+7. Complete Task:
+   { "type": "COMPLETE_TASK", "payload": { "taskId": "Existing Task ID" } }
+8. Update Routine:
+   { "type": "UPDATE_ROUTINE", "payload": { "routineId": "Existing Routine ID", "title": "New Title" } }
+9. Delete Routine:
+   { "type": "DELETE_ROUTINE", "payload": { "routineId": "Existing Routine ID" } }
+10. Complete Subtask:
+    { "type": "COMPLETE_SUBTASK", "payload": { "subtaskId": "Existing Subtask ID" } }
+11. Create Goal:
+    { "type": "CREATE_GOAL", "payload": { "title": "Goal Title", "description": "Optional description", "targetDate": "YYYY-MM-DD" } }
+
+Respond ONLY with a JSON object in this format (do NOT wrap it in markdown code blocks like \`\`\`json, do NOT output any other text outside the JSON):
+{
+  "intent": "Intent category here",
+  "reply": "Your natural language response here.",
+  "actions": [
+    // Array of action objects
+  ]
+}
+          `;
+
+          const activeThread = get().chatThreads.find((t) => t.id === get().activeThreadId);
+          const threadMessages = activeThread ? activeThread.messages : [];
+
+          // Clean/format thread messages for Gemini contents parameter:
+          const contents: { role: 'user' | 'model'; parts: { text: string }[] }[] = [];
+          
+          threadMessages.forEach((m, idx) => {
+            const role = m.sender === 'user' ? 'user' : 'model';
+            // Skip welcome message if it's the very first message (to ensure the conversation starts with 'user')
+            if (idx === 0 && role === 'model') {
+              return;
+            }
+            
+            // If the last message has the same role, combine their text to keep alternation strict
+            if (contents.length > 0 && contents[contents.length - 1].role === role) {
+              contents[contents.length - 1].parts[0].text += '\n\n' + m.text;
+            } else {
+              contents.push({
+                role,
+                parts: [{ text: m.text }]
+              });
+            }
+          });
+
+          // Fallback if contents is empty
+          if (contents.length === 0) {
+            contents.push({
+              role: 'user',
+              parts: [{ text: userMessage }]
+            });
+          }
+
+          const model = get().selectedModel || 'gemini-3.5-flash';
+          
+          // Build endpoints ONLY for the user's selected model, trying both v1 and v1beta:
+          const urls = [
+            `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${currentApiKey}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${currentApiKey}`
+          ];
+
+          const errors: string[] = [];
+          let success = false;
+          let responseData: any = null; // eslint-disable-line @typescript-eslint/no-explicit-any
+
+          for (const url of urls) {
+            try {
+              const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  contents,
+                  systemInstruction: {
+                    parts: [{ text: contextPrompt }]
+                  }
+                }),
+                signal: controller.signal
+              });
+
+              if (!response.ok) {
+                const errData = await response.json();
+                const errMsg = errData.error?.message || response.statusText;
+                const modelName = url.split('/models/')[1].split(':')[0];
+                const apiVer = url.includes('v1beta') ? 'v1beta' : 'v1';
+                errors.push(`${modelName} (${apiVer}): ${errMsg}`);
+                continue;
+              }
+
+              const data = await response.json();
+              const resultText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+              
+              let cleanText = resultText.trim();
+              if (cleanText.startsWith('```')) {
+                cleanText = cleanText
+                  .replace(/^```json/, '')
+                  .replace(/^```/, '')
+                  .replace(/```$/, '')
+                  .trim();
+              }
+              
+              const modelName = url.split('/models/')[1].split(':')[0];
+              responseData = {
+                content: JSON.parse(cleanText),
+                usage: data.usageMetadata || null,
+                modelName: modelName
+              };
+              success = true;
+              break;
+            } catch (err) {
+              if (err instanceof Error && err.name === 'AbortError') {
+                throw err;
+              }
+              const modelName = url.split('/models/')[1].split(':')[0];
+              const errMsg = err instanceof Error ? err.message : String(err);
+              errors.push(`${modelName}: ${errMsg}`);
+            }
+          }
+
+          if (!success) {
+            throw new Error(`All endpoints failed:\n${errors.map((e) => `• ${e}`).join('\n')}`);
+          }
+
+          // 2. Append Agent response text
+          get().addMessageToActiveThread({
+            id: `a-${crypto.randomUUID()}`,
+            sender: 'agent',
+            text: responseData.content?.reply || 'Request processed successfully.',
+            model: responseData.modelName,
+          });
+
+          // 3. Save token usage metadata
+          if (responseData.usage) {
+            get().updateActiveThreadTokenUsage({
+              input: responseData.usage.promptTokenCount || 0,
+              output: responseData.usage.candidatesTokenCount || 0,
+              reasoning: responseData.usage.thoughtsTokenCount || 0,
+              total: responseData.usage.totalTokenCount || 0,
+            });
+          }
+
+          // 4. Execute actions
+          if (responseData.content?.actions && Array.isArray(responseData.content.actions)) {
+            const actionFeedbacks: string[] = [];
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            responseData.content.actions.forEach((act: any) => {
+              if (act.type === 'CREATE_TASK' && act.payload?.title) {
+                const taskId = `t-${crypto.randomUUID()}`;
+                const newTask: Task = {
+                  id: taskId,
+                  user_id: get().user?.id,
+                  title: act.payload.title,
+                  description: act.payload.description || '',
+                  status: 'todo',
+                  created_at: new Date().toISOString(),
+                  dueDate: act.payload.dueDate,
+                  priority: act.payload.priority || 'MEDIUM',
+                };
+
+                const subtasksToAdd: Subtask[] = [];
+                const syncQueueToAdd: SyncAction[] = [];
+
+                if (act.payload.subtasks && Array.isArray(act.payload.subtasks)) {
+                  act.payload.subtasks.forEach((subTitle: string) => {
+                    const newSubtask: Subtask = {
+                      id: `st-${crypto.randomUUID()}`,
+                      task_id: taskId,
+                      title: subTitle,
+                      is_completed: false,
+                      created_at: new Date().toISOString(),
+                    };
+                    subtasksToAdd.push(newSubtask);
+                    if (get().user) {
+                      syncQueueToAdd.push({ id: crypto.randomUUID(), action: 'insert', table: 'task_subtasks', payload: newSubtask } as SyncAction);
+                    }
+                    actionFeedbacks.push(`Subtask added: "${subTitle}"`);
+                  });
+                }
+
+                let newTimeLog: TaskTimeLog | null = null;
+                if (act.payload.timeLog && typeof act.payload.timeLog === 'object') {
+                  const durationSeconds = act.payload.timeLog.durationSeconds || 0;
+                  const logDesc = act.payload.timeLog.description || 'Logged via AI Assistant';
+                  const startedAt = new Date(Date.now() - durationSeconds * 1000).toISOString();
+                  const endedAt = new Date().toISOString();
+
+                  newTimeLog = {
+                    id: `tl-${crypto.randomUUID()}`,
+                    task_id: taskId,
+                    user_id: get().user?.id,
+                    started_at: startedAt,
+                    ended_at: endedAt,
+                    duration_seconds: durationSeconds,
+                    description: logDesc,
+                    created_at: endedAt,
+                  };
+                  if (get().user) {
+                    syncQueueToAdd.push({ id: crypto.randomUUID(), action: 'insert', table: 'task_time_logs', payload: newTimeLog } as SyncAction);
+                  }
+                  const hrs = Math.floor(durationSeconds / 3600);
+                  const mins = Math.floor((durationSeconds % 3600) / 60);
+                  const timeStr = hrs > 0 ? `${hrs}h ${mins}m` : `${mins}m`;
+                  actionFeedbacks.push(`Time log added: ${timeStr} ("${logDesc}")`);
+                }
+
+                set((state) => ({
+                  tasks: [...state.tasks, newTask],
+                  subtasks: [...state.subtasks, ...subtasksToAdd],
+                  taskTimeLogs: newTimeLog ? [newTimeLog, ...state.taskTimeLogs] : state.taskTimeLogs,
+                  syncQueue: state.user
+                    ? [
+                        ...state.syncQueue,
+                        { id: crypto.randomUUID(), action: 'insert', table: 'tasks', payload: newTask } as SyncAction,
+                        ...syncQueueToAdd
+                      ]
+                    : state.syncQueue,
+                }));
+
+                get().processSyncQueue();
+              } else if (act.type === 'CREATE_ROUTINE' && act.payload?.title) {
+                get().addRoutine(act.payload.title, act.payload.category || 'Health');
+                actionFeedbacks.push(`Habit created: "${act.payload.title}" [${act.payload.category || 'Health'}]`);
+              } else if (act.type === 'CREATE_SUBTASK' && act.payload?.taskId && act.payload?.title) {
+                get().addSubtask(act.payload.taskId, act.payload.title);
+                actionFeedbacks.push(`Subtask added: "${act.payload.title}"`);
+              } else if (act.type === 'CREATE_TIME_LOG' && act.payload?.taskId && act.payload?.durationSeconds) {
+                const durationSeconds = act.payload.durationSeconds;
+                const logDesc = act.payload.description || 'Logged via AI Assistant';
+                const startedAt = new Date(Date.now() - durationSeconds * 1000).toISOString();
+                get().addManualTimeLog(act.payload.taskId, durationSeconds, logDesc, startedAt);
+
+                const hrs = Math.floor(durationSeconds / 3600);
+                const mins = Math.floor((durationSeconds % 3600) / 60);
+                const timeStr = hrs > 0 ? `${hrs}h ${mins}m` : `${mins}m`;
+                actionFeedbacks.push(`Time log added: ${timeStr} ("${logDesc}")`);
+              } else if (act.type === 'UPDATE_TASK' && act.payload?.taskId) {
+                const { taskId, ...updates } = act.payload;
+                const cleanedUpdates: Partial<Omit<Task, 'id' | 'created_at' | 'user_id'>> = {};
+                if (updates.title !== undefined) cleanedUpdates.title = updates.title;
+                if (updates.description !== undefined) cleanedUpdates.description = updates.description;
+                if (updates.dueDate !== undefined) cleanedUpdates.dueDate = updates.dueDate;
+                if (updates.priority !== undefined) cleanedUpdates.priority = updates.priority;
+                if (updates.status !== undefined) cleanedUpdates.status = updates.status;
+
+                get().updateTask(taskId, cleanedUpdates);
+                const task = get().tasks.find((t) => t.id === taskId);
+                actionFeedbacks.push(`Task updated: "${task ? task.title : taskId}"`);
+              } else if (act.type === 'DELETE_TASK' && act.payload?.taskId) {
+                const task = get().tasks.find((t) => t.id === act.payload.taskId);
+                const title = task ? task.title : act.payload.taskId;
+                get().deleteTask(act.payload.taskId);
+                actionFeedbacks.push(`Task deleted: "${title}"`);
+              } else if (act.type === 'COMPLETE_TASK' && act.payload?.taskId) {
+                const task = get().tasks.find((t) => t.id === act.payload.taskId);
+                const title = task ? task.title : act.payload.taskId;
+                get().updateTaskStatus(act.payload.taskId, 'completed');
+                actionFeedbacks.push(`Task marked completed: "${title}"`);
+              } else if (act.type === 'UPDATE_ROUTINE' && act.payload?.routineId && act.payload?.title) {
+                get().updateRoutine(act.payload.routineId, act.payload.title);
+                actionFeedbacks.push(`Routine updated to: "${act.payload.title}"`);
+              } else if (act.type === 'DELETE_ROUTINE' && act.payload?.routineId) {
+                const routine = get().routines.find((r) => r.id === act.payload.routineId);
+                const title = routine ? routine.title : act.payload.routineId;
+                get().deleteRoutine(act.payload.routineId);
+                actionFeedbacks.push(`Routine deleted: "${title}"`);
+              } else if (act.type === 'COMPLETE_SUBTASK' && act.payload?.subtaskId) {
+                const subtask = get().subtasks.find((st) => st.id === act.payload.subtaskId);
+                if (subtask) {
+                  if (!subtask.is_completed) {
+                    get().toggleSubtask(act.payload.subtaskId);
+                  }
+                  actionFeedbacks.push(`Subtask marked completed: "${subtask.title}"`);
+                } else {
+                  actionFeedbacks.push(`Subtask not found: "${act.payload.subtaskId}"`);
+                }
+              } else if (act.type === 'CREATE_GOAL' && act.payload?.title) {
+                get().addGoal(act.payload.title, act.payload.description || '', act.payload.targetDate);
+                actionFeedbacks.push(`Goal created: "${act.payload.title}"`);
+              }
+            });
+            set({ aiFeedback: actionFeedbacks });
+          }
+
+        } catch (err) {
+          if (err instanceof Error && err.name === 'AbortError') {
+            console.log('Gemini request aborted by user');
+            return;
+          }
+          console.error(err);
+          const errMsg = err instanceof Error ? err.message : 'Check your API key and connection.';
+          get().addMessageToActiveThread({
+            id: `err-${crypto.randomUUID()}`,
+            sender: 'agent',
+            text: `Error calling Gemini: ${errMsg}`,
+          });
+        } finally {
+          set({ isAiResponding: false, abortController: null });
+        }
+      },
+    }),
+    {
+      name: 'goal-tracker-storage',
+      partialize: (state) => ({
+        user: state.user,
+        isGuestMode: state.isGuestMode,
+        routines: state.routines,
+        routineLogs: state.routineLogs,
+        tasks: state.tasks,
+        subtasks: state.subtasks,
+        taskTimeLogs: state.taskTimeLogs,
+        goals: state.goals,
+        activeTimer: state.activeTimer,
+        syncQueue: state.syncQueue,
+        chatThreads: state.chatThreads,
+        activeThreadId: state.activeThreadId,
+        selectedModel: state.selectedModel,
+      }),
+    }
+  )
+);

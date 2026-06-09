@@ -1,0 +1,73 @@
+.bottomNav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: var(--nav-height);
+  background: var(--bg-card);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  padding: 0 8px;
+  z-index: 100;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.03);
+}
+
+.navItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  height: 100%;
+  flex: 1;
+  transition: all 0.2s ease;
+}
+
+.navItem :global(svg) {
+  transition: transform 0.2s ease;
+}
+
+.navItem:active :global(svg) {
+  transform: scale(0.85);
+}
+
+.activeNavItem {
+  color: var(--color-primary);
+}
+
+.logoutBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  height: 100%;
+  flex: 1;
+}
+
+.logoutBtn:hover {
+  color: var(--color-danger);
+}
+
+/* Hide on desktop and tablet, show only on mobile */
+@media (min-width: 768px) {
+  .bottomNav {
+    display: none;
+  }
+}

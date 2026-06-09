@@ -1,0 +1,372 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-width: 800px;
+  margin: 0 auto;
+  padding-bottom: 40px;
+}
+
+.header {
+  margin-bottom: 8px;
+}
+
+.title {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.subtitle {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+/* Heatmap Card */
+.cardHeatmap {
+  padding: 24px;
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.cardTitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.heatmapGrid {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 8px;
+  max-width: 450px;
+}
+
+@media (min-width: 500px) {
+  .heatmapGrid {
+    grid-template-columns: repeat(15, 1fr);
+  }
+}
+
+@media (min-width: 768px) {
+  .heatmapGrid {
+    grid-template-columns: repeat(30, 1fr);
+    max-width: 100%;
+  }
+}
+
+.heatmapCell {
+  aspect-ratio: 1;
+  border-radius: 4px;
+  border: 1px solid rgba(0, 0, 0, 0.02);
+  cursor: pointer;
+  position: relative;
+  transition: transform 0.1s ease;
+}
+
+.heatmapCell:hover {
+  transform: scale(1.15);
+  z-index: 5;
+}
+
+.cell0 { background-color: var(--bg-sidebar); }
+.cell1 { background-color: #d1fae5; }
+.cell2 { background-color: #a7f3d0; }
+.cell3 { background-color: #34d399; }
+.cell4 { background-color: #059669; }
+
+.heatmapLegend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  align-self: flex-start;
+}
+
+.legendBox {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+}
+
+/* Collapsible Form Toggle */
+.formToggleBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-start;
+  padding: 10px 20px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-strong);
+  background-color: white;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-primary);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.formToggleBtn:hover {
+  background-color: var(--color-primary-light);
+  border-color: var(--color-primary);
+  transform: translateY(-1px);
+}
+
+.addBar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+  padding: 20px;
+  background-color: var(--bg-card);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  animation: slideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.input {
+  flex: 1;
+  min-width: 200px;
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background-color: white;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.select {
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background-color: white;
+  font-size: 14px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.addBtn {
+  padding: 12px 20px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: var(--grad-primary);
+  color: white;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.addBtn:hover {
+  opacity: 0.95;
+}
+
+.cancelFormBtn {
+  padding: 12px 16px;
+  background-color: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.cancelFormBtn:hover {
+  background-color: var(--bg-sidebar);
+}
+
+/* Habit List */
+.listContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: relative;
+}
+
+.sectionDivider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 16px 0 8px 0;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.sectionDivider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background-color: var(--border-subtle);
+}
+
+/* Habit Item Card */
+.routineWrapper {
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  touch-action: pan-y; /* Prevent default vertical scrolling when swiping horizontally */
+  position: relative;
+  background-color: var(--bg-sidebar);
+}
+
+.routineItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-radius: var(--radius-md);
+  gap: 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  transition: transform 0.15s ease-out, background-color 0.2s ease;
+  position: relative;
+  z-index: 2;
+}
+
+.routineItemCompleted {
+  background-color: rgba(255, 255, 255, 0.45);
+}
+
+.swipeIndicator {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  font-size: 12px;
+  font-weight: 700;
+  color: white;
+  z-index: 1;
+}
+
+.swipeIndicatorLeft {
+  background: var(--grad-danger);
+  justify-content: flex-end;
+}
+
+.swipeIndicatorRight {
+  background: var(--grad-success);
+  justify-content: flex-start;
+}
+
+.routineMain {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+}
+
+.checkboxContainer {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid var(--border-strong);
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  background-color: white;
+}
+
+.checkboxContainer:hover {
+  border-color: var(--color-primary);
+  transform: scale(1.06);
+}
+
+.checkboxChecked {
+  border-color: var(--color-success);
+  background-color: var(--color-success);
+  color: white;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+}
+
+.routineDetails {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.routineTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  transition: color 0.25s ease;
+}
+
+.badge {
+  display: inline-flex;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-size: 10px;
+  font-weight: 700;
+  width: fit-content;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.badgeHealth { background-color: var(--color-info-light); color: var(--color-info); }
+.badgeFitness { background-color: var(--color-danger-light); color: var(--color-danger); }
+.badgeMindset { background-color: var(--color-primary-light); color: var(--color-primary); }
+.badgeLearning { background-color: var(--color-warning-light); color: var(--color-warning); }
+.badgeWork { background-color: rgba(96, 100, 108, 0.1); color: var(--text-secondary); }
+
+.routineMeta {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.streaks {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.streakItem {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.streakItem svg {
+  color: #f97316;
+}
+
+.deleteBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.deleteBtn:hover {
+  background-color: var(--color-danger-light);
+  color: var(--color-danger);
+}
