@@ -10,13 +10,12 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  height: 100%;
+  height: calc(100vh - var(--nav-height)); /* Sit exactly above the mobile bottom nav */
   overflow-y: auto;
   position: relative;
   padding: 24px;
-  padding-bottom: calc(var(--nav-height) + 90px); /* Extra spacing on mobile for bottom nav and floating FAB */
+  padding-bottom: 80px; /* Clear the floating FAB button */
 }
-
 
 /* Tab contents padding adjustments */
 .tabContainer {
@@ -29,10 +28,12 @@
 /* Responsiveness media query adjustments */
 @media (min-width: 768px) {
   .mainContent {
+    height: 100%; /* Reset to full height since bottom nav is hidden on desktop */
     padding: 40px;
-    padding-bottom: 40px; /* Reset bottom spacing since bottom nav is hidden */
+    padding-bottom: 40px;
   }
 }
+
 
 /* Hide sidebar on mobile screen size, show sidebar on wider viewports */
 .sidebarWrapper {
