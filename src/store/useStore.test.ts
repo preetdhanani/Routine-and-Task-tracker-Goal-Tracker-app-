@@ -1,22 +1,31 @@
 import { beforeEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import type { useStore as UseStoreType } from './useStore';
+
 
 // 1. Polyfill crypto.randomUUID for Node environments where it might not be globally attached
-if (typeof global !== 'undefined' && !global.crypto) {
-  // @ts-ignore
-  global.crypto = {
-    randomUUID: () => 'test-uuid-1234'
-  };
-} else if (typeof global !== 'undefined' && !global.crypto.randomUUID) {
-  // @ts-ignore
-  global.crypto.randomUUID = () => 'test-uuid-1234';
+if (typeof globalThis !== 'undefined') {
+  if (!globalThis.crypto) {
+    Object.defineProperty(globalThis, 'crypto', {
+      value: {
+        randomUUID: () => 'test-uuid-1234'
+      },
+      writable: true
+    });
+  } else if (!globalThis.crypto.randomUUID) {
+    Object.defineProperty(globalThis.crypto, 'randomUUID', {
+      value: () => 'test-uuid-1234',
+      writable: true
+    });
+  }
 }
+
 
 // 2. Mock localStorage for Zustand persist middleware
 const localStorageMock = (() => {
   let store: Record<string, string> = {};
   return {
     getItem: (key: string) => store[key] || null,
-    setItem: (key: string, value: any) => {
+    setItem: (key: string, value: string) => {
       store[key] = String(value);
     },
     clear: () => {
@@ -64,7 +73,7 @@ vi.mock('../lib/supabase', () => {
 });
 
 // Declare useStore dynamically
-let useStore: any;
+let useStore: typeof UseStoreType;
 
 
 describe('Zustand State Store (useStore)', () => {
