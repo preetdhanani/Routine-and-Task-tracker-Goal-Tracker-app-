@@ -28,7 +28,7 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
 
   const getDisplaySubtitle = () => {
     if (isGuestMode) return 'Offline Sandbox';
-    return 'Cloud Synchronized';
+    return '';
   };
 
   const handleLogout = async () => {
@@ -118,9 +118,11 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
               <span className={styles.userName} title={getDisplayName()}>
                 {getDisplayName()}
               </span>
-              <span className={styles.userRole}>
-                {getDisplaySubtitle()}
-              </span>
+              {getDisplaySubtitle() && (
+                <span className={styles.userRole}>
+                  {getDisplaySubtitle()}
+                </span>
+              )}
             </div>
           </div>
           <button onClick={handleLogout} className={styles.logoutBtn} title="Sign Out">
