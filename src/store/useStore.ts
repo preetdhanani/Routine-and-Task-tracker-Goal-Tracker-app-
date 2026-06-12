@@ -1099,100 +1099,7 @@ export const useStore = create<GoalTrackerState>()(
           const taskTimeLogs = get().taskTimeLogs;
           const goals = get().goals;
 
-          const contextPrompt = `
-You are a helpful Goal Tracker AI assistant acting as an intelligent productivity coach.
-Current date: ${todayStr}
-
-Current User State:
-- Goals List: ${JSON.stringify(goals.map(g => ({ id: g.id, title: g.title, description: g.description, targetDate: g.target_date })))}
-- Daily Routines: ${JSON.stringify(routines.map(r => ({ id: r.id, title: r.title, category: r.category, isActive: r.is_active })))}
-- Daily Routine Completion Logs: ${JSON.stringify(routineLogs)}
-- Tasks list: ${JSON.stringify(tasks.map(t => ({ id: t.id, title: t.title, description: t.description, status: t.status, dueDate: t.dueDate, priority: t.priority })))}
-- Subtasks checklist: ${JSON.stringify(subtasks.map(st => ({ id: st.id, taskId: st.task_id, title: st.title, isCompleted: st.is_completed })))}
-- Task Time Logs: ${JSON.stringify(taskTimeLogs.map(l => {
-            const task = tasks.find(t => t.id === l.task_id);
-            return { taskTitle: task ? task.title : 'Task', durationSecs: l.duration_seconds, note: l.description, date: l.started_at };
-          }))}
-
-You can answer questions about the user's history, goals, tasks, routines, and statistics.
-You can also set up new tasks, goals, routines, subtasks, and log time.
-When giving natural language responses or offering motivation, feel free to draw inspiration from, quote, or explain ancient Hindu wisdom and shlokas from the Mahabharata/Bhagavad Gita (such as Karma Yoga - doing duty without attachment to outcomes) and the Ramayana (such as Valmiki's teachings on enthusiasm and duty).
-
-
-INTENT CLASSIFICATION:
-You must classify the user's intent as one of the following:
-- "CHAT": Standard conversation, asking questions, or responding to general topics.
-- "CREATE_TASK": User requests to create/add a new task.
-- "CREATE_ROUTINE": User requests to create/add a new routine.
-- "CREATE_SUBTASK": User requests to create/add a subtask to an existing task.
-- "CREATE_TIME_LOG": User requests to log time for an existing task.
-- "UPDATE_TASK": User requests to edit/update a task's details, priority, or due date.
-- "DELETE_TASK": User requests to delete a task.
-- "COMPLETE_TASK": User requests to finish or mark a task as completed.
-- "ANALYTICS": User requests analysis, statistics, or summaries of their productivity.
-- "UPDATE_ROUTINE": User requests to rename or update a routine.
-- "DELETE_ROUTINE": User requests to delete a routine.
-- "COMPLETE_SUBTASK": User requests to mark a subtask/milestone as completed.
-- "CREATE_GOAL": User requests to add/create a long-term goal.
-- "MULTI_ACTION": User requests multiple changes in a single query (e.g. creating a task and logging time).
-
-CLARIFICATION & VALIDATION RULES:
-1. Ambiguity Handling: If a user specifies a task name/phrase that matches multiple tasks (e.g. "Add 1 hour to my ML task" when there are "Learn ML", "ML Thesis", and "ML Interview Prep" tasks), or if the user asks to modify/delete/log time for a task and the reference is vague/ambiguous:
-   - DO NOT make assumptions or choose arbitrarily.
-   - DO NOT generate any action objects in the "actions" list (leave it empty: []).
-   - Set "intent" to "CHAT".
-   - Ask the user a clarifying question listing the matches, e.g.: "Which task would you like to log time for: Learn ML or ML Thesis?"
-2. ID Validation:
-   - For all actions on existing entities (UPDATE_TASK, DELETE_TASK, COMPLETE_TASK, CREATE_SUBTASK, CREATE_TIME_LOG, COMPLETE_SUBTASK, UPDATE_ROUTINE, DELETE_ROUTINE), you MUST ensure the targeted entity exists in the user state and use its valid ID from the context.
-   - If the targeted entity does not exist or cannot be resolved, DO NOT generate any action, set the intent to "CHAT", and reply explaining that the entity wasn't found or ask for clarification.
-
-SUPPORTED ACTIONS:
-You can trigger any number of actions in the "actions" array.
-1. Create Task:
-   {
-     "type": "CREATE_TASK",
-     "payload": {
-       "title": "Task Title",
-       "description": "Optional description (do not put subtasks, time logs, priority, or deadline info here)",
-       "dueDate": "YYYY-MM-DD", // Extract relative dates ("today" = ${todayStr}, "tomorrow", "next Monday", or absolute dates)
-       "priority": "LOW" | "MEDIUM" | "HIGH" | "CRITICAL", // Extract priority from urgency keywords. Default to "MEDIUM"
-       "subtasks": ["Subtask 1", "Subtask 2"], // Extract checklist subtasks if mentioned in creation
-       "timeLog": { // If user specifies duration/time allotment (e.g. "for 1 hour")
-         "durationSeconds": 3600,
-         "description": "Optional description"
-       }
-     }
-   }
-2. Create Routine:
-   { "type": "CREATE_ROUTINE", "payload": { "title": "Routine Title", "category": "Health" | "Mindset" | "Fitness" | "Learning" | "Work" } }
-3. Create Subtask:
-   { "type": "CREATE_SUBTASK", "payload": { "taskId": "Existing Task ID", "title": "Subtask Title" } }
-4. Create Time Log:
-   { "type": "CREATE_TIME_LOG", "payload": { "taskId": "Existing Task ID", "durationSeconds": 3600, "description": "Optional note" } }
-5. Update Task:
-   { "type": "UPDATE_TASK", "payload": { "taskId": "Existing Task ID", "title": "New Title", "description": "New Description", "dueDate": "YYYY-MM-DD", "priority": "LOW" | "MEDIUM" | "HIGH" | "CRITICAL" } }
-6. Delete Task:
-   { "type": "DELETE_TASK", "payload": { "taskId": "Existing Task ID" } }
-7. Complete Task:
-   { "type": "COMPLETE_TASK", "payload": { "taskId": "Existing Task ID" } }
-8. Update Routine:
-   { "type": "UPDATE_ROUTINE", "payload": { "routineId": "Existing Routine ID", "title": "New Title" } }
-9. Delete Routine:
-   { "type": "DELETE_ROUTINE", "payload": { "routineId": "Existing Routine ID" } }
-10. Complete Subtask:
-    { "type": "COMPLETE_SUBTASK", "payload": { "subtaskId": "Existing Subtask ID" } }
-11. Create Goal:
-    { "type": "CREATE_GOAL", "payload": { "title": "Goal Title", "description": "Optional description", "targetDate": "YYYY-MM-DD" } }
-
-Respond ONLY with a JSON object in this format (do NOT wrap it in markdown code blocks like \`\`\`json, do NOT output any other text outside the JSON):
-{
-  "intent": "Intent category here",
-  "reply": "Your natural language response here.",
-  "actions": [
-    // Array of action objects
-  ]
-}
-          `;
+          // System prompt template is now resolved on the server-side in the /api/chat route to maintain a secure, version-controlled prompt registry.          `;
 
           const activeThread = get().chatThreads.find((t) => t.id === get().activeThreadId);
           const threadMessages = activeThread ? activeThread.messages : [];
@@ -1227,72 +1134,43 @@ Respond ONLY with a JSON object in this format (do NOT wrap it in markdown code 
           }
 
           const model = get().selectedModel || 'gemini-3.5-flash';
-          
-          // Build endpoints ONLY for the user's selected model, trying both v1 and v1beta:
-          const urls = [
-            `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${currentApiKey}`,
-            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${currentApiKey}`
-          ];
-
-          const errors: string[] = [];
-          let success = false;
           let responseData: any = null; // eslint-disable-line @typescript-eslint/no-explicit-any
 
-          for (const url of urls) {
-            try {
-              const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  contents,
-                  systemInstruction: {
-                    parts: [{ text: contextPrompt }]
-                  }
-                }),
-                signal: controller.signal
-              });
+          try {
+            const response = await fetch('/api/chat', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents,
+                selectedModel: model,
+                apiKey: currentApiKey,
+                state: {
+                  date: todayStr,
+                  goals: goals.map(g => ({ id: g.id, title: g.title, description: g.description, targetDate: g.target_date })),
+                  routines: routines.map(r => ({ id: r.id, title: r.title, category: r.category, isActive: r.is_active })),
+                  routineLogs,
+                  tasks: tasks.map(t => ({ id: t.id, title: t.title, description: t.description, status: t.status, dueDate: t.dueDate, priority: t.priority })),
+                  subtasks: subtasks.map(st => ({ id: st.id, taskId: st.task_id, title: st.title, isCompleted: st.is_completed })),
+                  taskTimeLogs: taskTimeLogs.map(l => {
+                    const task = tasks.find(t => t.id === l.task_id);
+                    return { taskTitle: task ? task.title : 'Task', durationSecs: l.duration_seconds, note: l.description, date: l.started_at };
+                  })
+                }
+              }),
+              signal: controller.signal
+            });
 
-              if (!response.ok) {
-                const errData = await response.json();
-                const errMsg = errData.error?.message || response.statusText;
-                const modelName = url.split('/models/')[1].split(':')[0];
-                const apiVer = url.includes('v1beta') ? 'v1beta' : 'v1';
-                errors.push(`${modelName} (${apiVer}): ${errMsg}`);
-                continue;
-              }
-
-              const data = await response.json();
-              const resultText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-              
-              let cleanText = resultText.trim();
-              if (cleanText.startsWith('```')) {
-                cleanText = cleanText
-                  .replace(/^```json/, '')
-                  .replace(/^```/, '')
-                  .replace(/```$/, '')
-                  .trim();
-              }
-              
-              const modelName = url.split('/models/')[1].split(':')[0];
-              responseData = {
-                content: JSON.parse(cleanText),
-                usage: data.usageMetadata || null,
-                modelName: modelName
-              };
-              success = true;
-              break;
-            } catch (err) {
-              if (err instanceof Error && err.name === 'AbortError') {
-                throw err;
-              }
-              const modelName = url.split('/models/')[1].split(':')[0];
-              const errMsg = err instanceof Error ? err.message : String(err);
-              errors.push(`${modelName}: ${errMsg}`);
+            if (!response.ok) {
+              const errData = await response.json();
+              throw new Error(errData.error || response.statusText);
             }
-          }
 
-          if (!success) {
-            throw new Error(`All endpoints failed:\n${errors.map((e) => `• ${e}`).join('\n')}`);
+            responseData = await response.json();
+          } catch (err) {
+            if (err instanceof Error && err.name === 'AbortError') {
+              throw err;
+            }
+            throw new Error(`Chat API failed: ${err instanceof Error ? err.message : String(err)}`);
           }
 
           // 2. Append Agent response text

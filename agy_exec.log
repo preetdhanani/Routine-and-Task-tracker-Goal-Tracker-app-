@@ -1,0 +1,3 @@
+--- Start Direct CLI Execution ---
+Timeout reached. Killing child process...
+EXIT: code=null, signal=SIGTERM
