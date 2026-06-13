@@ -58,14 +58,20 @@ export default function AgentSection({ onClose }: AgentSectionProps) {
       'Generating final response...'
     ];
     let currentIndex = 0;
-    setThinkingPhase(phases[0]);
+    
+    const timeout = setTimeout(() => {
+      setThinkingPhase(phases[0]);
+    }, 0);
     
     const interval = setInterval(() => {
       currentIndex = (currentIndex + 1) % phases.length;
       setThinkingPhase(phases[currentIndex]);
     }, 1800);
     
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(timeout);
+      clearInterval(interval);
+    };
   }, [isAiResponding]);
 
   const toggleThought = (msgId: string) => {
