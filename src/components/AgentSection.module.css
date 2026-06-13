@@ -886,3 +886,61 @@
   opacity: 0.95;
 }
 
+/* Thought Accordion Styles */
+.thoughtAccordion {
+  margin-top: 6px;
+  margin-bottom: 8px;
+  border-left: 2px dashed var(--border-strong);
+  padding-left: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.thoughtHeader {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+  transition: all 0.2s ease;
+  width: fit-content;
+}
+
+.thoughtHeader:hover {
+  background-color: rgba(28, 32, 36, 0.04);
+  color: var(--text-primary);
+}
+
+.thoughtBrainIcon {
+  color: var(--color-primary);
+}
+
+.thoughtHeaderText {
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.thoughtChevron {
+  opacity: 0.7;
+}
+
+.thoughtContent {
+  font-size: 12px;
+  font-style: italic;
+  color: var(--text-muted);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  background-color: var(--bg-sidebar);
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  margin-top: 2px;
+}
+

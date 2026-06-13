@@ -44,3 +44,7 @@ next-env.d.ts
 #MDs
 *.md
 !README.md
+
+# local logs
+/logs/
+*.log

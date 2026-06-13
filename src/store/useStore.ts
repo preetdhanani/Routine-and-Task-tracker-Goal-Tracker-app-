@@ -72,6 +72,7 @@ export interface AgentChatMessage {
   text: string;
   timestamp: string;
   model?: string;
+  thinking?: string; // Expose the agent's chain-of-thought
   tokenUsage?: {
     input: number;
     output: number;
@@ -1136,6 +1137,50 @@ export const useStore = create<GoalTrackerState>()(
           const model = get().selectedModel || 'gemini-3.5-flash';
           let responseData: any = null; // eslint-disable-line @typescript-eslint/no-explicit-any
 
+          // 1. Compression helpers to strip grammatical stop words and trim text
+          const compressText = (text: string, maxWords = 6): string => {
+            if (!text) return '';
+            const stopWords = new Set(['a', 'an', 'the', 'to', 'for', 'in', 'on', 'at', 'and', 'or', 'of', 'with', 'about', 'is', 'are', 'was', 'were', 'been', 'my', 'your', 'i', 'you']);
+            return text
+              .toLowerCase()
+              .replace(/[^\w\s-]/g, '') // remove punctuation
+              .split(/\s+/)
+              .filter(word => word && !stopWords.has(word))
+              .slice(0, maxWords)
+              .join(' ');
+          };
+
+          const compressedRoutines = routines.map(r => {
+            const dates = routineLogs
+              .filter(log => log.routine_id === r.id)
+              .map(log => log.completed_date)
+              .join(',');
+            return `${r.id};${compressText(r.title, 4)};${r.category};${dates}`;
+          });
+
+          // Compress all tasks
+          const compressedTasks = tasks.map(t => {
+            const prio = t.priority ? t.priority[0] : 'M';
+            return `${t.id};${compressText(t.title, 5)};${compressText(t.description, 8)};${t.status};${prio}`;
+          });
+
+          // Compress all subtasks
+          const compressedSubtasks = subtasks
+            .map(st => `${st.id};${st.task_id};${compressText(st.title, 5)};${st.is_completed}`);
+
+          // Compress all time logs
+          const compressedTimeLogs = taskTimeLogs
+            .map(l => {
+              const task = tasks.find(t => t.id === l.task_id);
+              const taskTitle = compressText(task ? task.title : 'Task', 3);
+              const note = compressText(l.description || '', 6);
+              const date = l.started_at.split('T')[0];
+              return `${taskTitle};${l.duration_seconds};${note};${date}`;
+            });
+
+          // Goals list compression
+          const compressedGoals = goals.map(g => `${g.id};${compressText(g.title, 5)};${compressText(g.description, 8)}`);
+
           try {
             const response = await fetch('/api/chat', {
               method: 'POST',
@@ -1146,15 +1191,11 @@ export const useStore = create<GoalTrackerState>()(
                 apiKey: currentApiKey,
                 state: {
                   date: todayStr,
-                  goals: goals.map(g => ({ id: g.id, title: g.title, description: g.description, targetDate: g.target_date })),
-                  routines: routines.map(r => ({ id: r.id, title: r.title, category: r.category, isActive: r.is_active })),
-                  routineLogs,
-                  tasks: tasks.map(t => ({ id: t.id, title: t.title, description: t.description, status: t.status, dueDate: t.dueDate, priority: t.priority })),
-                  subtasks: subtasks.map(st => ({ id: st.id, taskId: st.task_id, title: st.title, isCompleted: st.is_completed })),
-                  taskTimeLogs: taskTimeLogs.map(l => {
-                    const task = tasks.find(t => t.id === l.task_id);
-                    return { taskTitle: task ? task.title : 'Task', durationSecs: l.duration_seconds, note: l.description, date: l.started_at };
-                  })
+                  goals: compressedGoals,
+                  routines: compressedRoutines,
+                  tasks: compressedTasks,
+                  subtasks: compressedSubtasks,
+                  taskTimeLogs: compressedTimeLogs
                 }
               }),
               signal: controller.signal
@@ -1179,6 +1220,7 @@ export const useStore = create<GoalTrackerState>()(
             sender: 'agent',
             text: responseData.content?.reply || 'Request processed successfully.',
             model: responseData.modelName,
+            thinking: responseData.content?.thinking || '',
           });
 
           // 3. Save token usage metadata

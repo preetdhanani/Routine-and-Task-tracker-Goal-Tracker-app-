@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useStore } from '../store/useStore';
 import styles from './AgentSection.module.css';
-import { Send, Sparkles, Check, Cpu, X, Plus, Trash, Settings, Key, AlertCircle } from 'lucide-react';
+import { Send, Sparkles, Check, Cpu, X, Plus, Trash, Settings, Key, AlertCircle, ChevronDown, ChevronUp, Brain } from 'lucide-react';
 
 interface AgentSectionProps {
   onClose: () => void;
@@ -37,7 +37,43 @@ export default function AgentSection({ onClose }: AgentSectionProps) {
   // Stats filter thread ID state
   const [statsFilterId, setStatsFilterId] = useState<string>('total');
 
+  // Local state to track expanded thought processes (message ID -> boolean)
+  const [expandedThoughts, setExpandedThoughts] = useState<Record<string, boolean>>({});
+
+  // Dynamic thinking phase state during loading
+  const [thinkingPhase, setThinkingPhase] = useState('Routing request...');
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Cycle thinking phases in UI while waiting for response
+  useEffect(() => {
+    if (!isAiResponding) return;
+    
+    const phases = [
+      'Routing request to dispatcher...',
+      'Consulting specialized agents...',
+      'Analyzing task dependency states...',
+      'Evaluating consistency & streaks...',
+      'Structuring output JSON rules...',
+      'Generating final response...'
+    ];
+    let currentIndex = 0;
+    setThinkingPhase(phases[0]);
+    
+    const interval = setInterval(() => {
+      currentIndex = (currentIndex + 1) % phases.length;
+      setThinkingPhase(phases[currentIndex]);
+    }, 1800);
+    
+    return () => clearInterval(interval);
+  }, [isAiResponding]);
+
+  const toggleThought = (msgId: string) => {
+    setExpandedThoughts(prev => ({
+      ...prev,
+      [msgId]: !prev[msgId]
+    }));
+  };
 
   useEffect(() => {
     const savedKey = localStorage.getItem('goal_tracker_gemini_key') || '';
@@ -446,6 +482,27 @@ export default function AgentSection({ onClose }: AgentSectionProps) {
                             {msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'}
                           </span>
                         </div>
+                        {msg.thinking && (
+                          <div className={styles.thoughtAccordion}>
+                            <button
+                              onClick={() => toggleThought(msg.id)}
+                              className={styles.thoughtHeader}
+                            >
+                              <Brain size={12} className={styles.thoughtBrainIcon} />
+                              <span className={styles.thoughtHeaderText}>Thought Process</span>
+                              {expandedThoughts[msg.id] ? (
+                                <ChevronUp size={12} className={styles.thoughtChevron} />
+                              ) : (
+                                <ChevronDown size={12} className={styles.thoughtChevron} />
+                              )}
+                            </button>
+                            {expandedThoughts[msg.id] && (
+                              <div className={styles.thoughtContent}>
+                                {msg.thinking}
+                              </div>
+                            )}
+                          </div>
+                        )}
                         <div className={styles.messageText}>
                           {msg.text}
                         </div>
@@ -469,7 +526,7 @@ export default function AgentSection({ onClose }: AgentSectionProps) {
                             <div className={styles.thinkingSparkle}>
                               <Sparkles size={14} className={styles.rotatingSparkle} />
                             </div>
-                            <span className={styles.thinkingText}>Analyzing workspace...</span>
+                            <span className={styles.thinkingText}>{thinkingPhase}</span>
                           </div>
                           <button
                             onClick={cancelAgentMessage}
