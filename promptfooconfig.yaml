@@ -7,7 +7,7 @@ providers:
 
 tests:
   # Test Case 1: Chat Agent - Simple greeting and role verification
-  - description: "Chat Agent: Check if the agent handles greetings and identifies as a coach"
+  - description: "Chat Agent: Check if the agent handles greetings and identifies as an agent"
     vars:
       date: "2026-06-12"
       message: "Hi! Tell me who you are."
@@ -17,7 +17,7 @@ tests:
         systemInstruction: file://prompts/chat_agent.txt
     assert:
       - type: icontains
-        value: "coach"
+        value: "agent"
       - type: javascript
         value: |
           const data = JSON.parse(output);
