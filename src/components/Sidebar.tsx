@@ -28,6 +28,20 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
     return user?.username || user?.email || 'User';
   };
 
+  const getFirstName = () => {
+    if (isGuestMode) return 'Guest';
+    const fullName = getDisplayName();
+    const parts = fullName.split(/[\s._@]+/);
+    let firstName = parts[0] || 'User';
+    if (firstName) {
+      firstName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
+    }
+    if (firstName.length > 10) {
+      return firstName.slice(0, 10);
+    }
+    return firstName;
+  };
+
   const getDisplaySubtitle = () => {
     if (isGuestMode) return 'Offline Sandbox';
     return '';
@@ -118,7 +132,7 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
             )}
             <div className={styles.userDetails}>
               <span className={styles.userName} title={getDisplayName()}>
-                {getDisplayName()}
+                {getFirstName()}
               </span>
               {getDisplaySubtitle() && (
                 <span className={styles.userRole}>
