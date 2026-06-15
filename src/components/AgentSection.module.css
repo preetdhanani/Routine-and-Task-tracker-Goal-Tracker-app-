@@ -1,19 +1,13 @@
-/* Backdrop blur modal overlay */
+/* Backdrop overlay */
 .modalBackdrop {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(28, 32, 36, 0.15);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 10000;
-  padding: 16px;
-  animation: backdropFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  background-color: rgba(0, 0, 0, 0.45);
+  z-index: 9999;
+  animation: backdropFadeIn 0.28s ease forwards;
 }
 
 @keyframes backdropFadeIn {
@@ -21,32 +15,30 @@
   to { opacity: 1; }
 }
 
-/* Centered modal container */
+/* Premium Slide-in AI Drawer */
 .modalBox {
-  background-color: white;
-  border: 1px solid var(--border-strong);
-  border-radius: 20px;
-  width: 100%;
-  max-width: 850px;
-  height: 650px;
-  max-height: 85vh;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.12);
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 420px;
+  max-width: 100vw;
+  height: 100vh;
+  background-color: var(--bg-sidebar);
+  border-left: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-lg);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   position: relative;
-  animation: modalScaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  z-index: 10000;
+  transform: translateX(100%);
+  animation: drawerSlideIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-@keyframes modalScaleIn {
-  from {
-    transform: scale(0.95) translateY(10px);
-    opacity: 0;
-  }
-  to {
-    transform: scale(1) translateY(0);
-    opacity: 1;
-  }
+@keyframes drawerSlideIn {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
 }
 
 /* Header inside Modal */
@@ -101,7 +93,7 @@
   font-size: 12px;
   font-weight: 700;
   color: var(--text-secondary);
-  background-color: white;
+  background-color: var(--bg-card);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
   padding: 6px 12px;
@@ -139,7 +131,7 @@
 
 /* API Key Configuration Banner */
 .keyConfigBanner {
-  background-color: white;
+  background-color: var(--bg-sidebar);
   border-bottom: 1px solid var(--border-subtle);
   padding: 16px 24px;
   display: flex;
@@ -193,7 +185,7 @@
   flex: 1;
   display: flex;
   overflow: hidden;
-  background-color: white;
+  background-color: var(--bg-canvas);
 }
 
 /* Left Sidebar of Threads */
@@ -222,7 +214,7 @@
   padding: 8px 12px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-strong);
-  background-color: white;
+  background-color: var(--bg-card);
   color: var(--color-primary);
   font-size: 12px;
   font-weight: 700;
@@ -266,7 +258,7 @@
 }
 
 .threadActive {
-  background-color: white;
+  background-color: var(--bg-card-hover);
   box-shadow: var(--shadow-sm);
   border: 1px solid var(--border-subtle);
 }
@@ -339,7 +331,7 @@
   border: 1px solid var(--border-strong);
   font-size: 13px;
   font-weight: 600;
-  background-color: white;
+  background-color: var(--bg-card);
 }
 
 .mobileActionRow {
@@ -355,7 +347,7 @@
   height: 30px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-strong);
-  background-color: white;
+  background-color: var(--bg-card);
   cursor: pointer;
 }
 
@@ -367,7 +359,7 @@
   display: flex;
   flex-direction: column;
   gap: 20px;
-  background-color: rgba(250, 250, 250, 0.4);
+  background-color: var(--bg-canvas);
 }
 
 /* Notion Q&A Avatar Centered Chat Row */
