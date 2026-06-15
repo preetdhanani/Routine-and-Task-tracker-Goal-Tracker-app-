@@ -4,7 +4,7 @@ import React from 'react';
 import { useStore } from '../store/useStore';
 import { supabase } from '../lib/supabase';
 import styles from './BottomNav.module.css';
-import { CheckSquare, Clock, BarChart2, LogOut } from 'lucide-react';
+import { CheckSquare, Clock, BarChart2, LogOut, Settings } from 'lucide-react';
 
 interface BottomNavProps {
   activeTab: string;
@@ -47,6 +47,14 @@ export default function BottomNav({ activeTab, setActiveTab }: BottomNavProps) {
       >
         <BarChart2 size={20} />
         Analytics
+      </button>
+
+      <button
+        onClick={() => setActiveTab('settings')}
+        className={`${styles.navItem} ${activeTab === 'settings' ? styles.activeNavItem : ''}`}
+      >
+        <Settings size={20} />
+        Settings
       </button>
 
       <button onClick={handleLogout} className={styles.logoutBtn} title="Sign Out">

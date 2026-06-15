@@ -4,7 +4,7 @@ import React from 'react';
 import { useStore } from '../store/useStore';
 import { supabase } from '../lib/supabase';
 import styles from './Sidebar.module.css';
-import { Compass, CheckSquare, Clock, BarChart2, LogOut, RefreshCw, AlertCircle } from 'lucide-react';
+import { Compass, CheckSquare, Clock, BarChart2, LogOut, RefreshCw, AlertCircle, Settings } from 'lucide-react';
 
 interface SidebarProps {
   activeTab: string;
@@ -125,9 +125,18 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
               )}
             </div>
           </div>
-          <button onClick={handleLogout} className={styles.logoutBtn} title="Sign Out">
-            <LogOut size={16} />
-          </button>
+          <div className={styles.userActions}>
+            <button
+              onClick={() => setActiveTab('settings')}
+              className={`${styles.settingsBtn} ${activeTab === 'settings' ? styles.activeSettingsBtn : ''}`}
+              title="Settings"
+            >
+              <Settings size={16} />
+            </button>
+            <button onClick={handleLogout} className={styles.logoutBtn} title="Sign Out">
+              <LogOut size={16} />
+            </button>
+          </div>
         </div>
       </div>
     </aside>

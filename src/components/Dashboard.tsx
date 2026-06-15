@@ -9,6 +9,7 @@ import RoutinesSection from './RoutinesSection';
 import TasksSection from './TasksSection';
 import AnalyticsSection from './AnalyticsSection';
 import AgentSection from './AgentSection';
+import SettingsSection from './SettingsSection';
 import { Clock, Square, X, Sparkles } from 'lucide-react';
 
 // Sub-component to handle ticking timer inside the floating widget
@@ -76,6 +77,8 @@ export default function Dashboard() {
         );
       case 'analytics':
         return <AnalyticsSection />;
+      case 'settings':
+        return <SettingsSection />;
       default:
         return (
           <TasksSection 
