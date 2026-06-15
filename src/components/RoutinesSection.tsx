@@ -313,7 +313,7 @@ const RoutineCard = ({
             <div className={styles.routineMeta}>
               <div className={styles.streaks}>
                 <div className={styles.streakItem} title="Current streak">
-                  <Flame size={16} />
+                  <Flame size={16} className={currentStreak >= 5 ? 'animate-flame-pulse' : ''} />
                   <span>{currentStreak}d</span>
                 </div>
                 <div className={styles.streakItem} title="Longest streak" style={{ color: 'var(--text-muted)' }}>

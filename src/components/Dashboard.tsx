@@ -10,36 +10,42 @@ import TasksSection from './TasksSection';
 import AnalyticsSection from './AnalyticsSection';
 import AgentSection from './AgentSection';
 import SettingsSection from './SettingsSection';
-import { Clock, Square, X, Sparkles } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
+import { useTimer } from '../hooks/useTimer';
 
-// Sub-component to handle ticking timer inside the floating widget
-const FloatingTimerDisplay = ({ startedAt }: { startedAt: string }) => {
-  const [seconds, setSeconds] = useState(0);
+// Timer bar rendered at the top of the workspace when a timer is running
+const TimerBar = ({
+  taskTitle,
+  startedAt,
+  onStop,
+  onDiscard,
+}: {
+  taskTitle: string;
+  startedAt: string;
+  onStop: (e: React.MouseEvent) => void;
+  onDiscard: (e: React.MouseEvent) => void;
+}) => {
+  const { displayTime } = useTimer(new Date(startedAt).getTime());
 
-  useEffect(() => {
-    const update = () => {
-      const diff = Math.max(0, Math.round((Date.now() - new Date(startedAt).getTime()) / 1000));
-      setSeconds(diff);
-    };
-    update();
-    const interval = setInterval(update, 1000);
-    return () => clearInterval(interval);
-  }, [startedAt]);
-
-  const format = (totalSecs: number) => {
-    const hrs = Math.floor(totalSecs / 3600);
-    const mins = Math.floor((totalSecs % 3600) / 60);
-    const secs = totalSecs % 60;
-    return [hrs, mins, secs].map((v) => String(v).padStart(2, '0')).join(':');
-  };
-
-  return <div className={styles.tickingTime}>{format(seconds)}</div>;
+  return (
+    <div className={styles.timerBar}>
+      <div className={styles.timerDot} />
+      <span className={styles.timerTaskTitle}>{taskTitle}</span>
+      <span className={styles.timerDisplay}>{displayTime}</span>
+      <button onClick={onStop} className={styles.timerBtnStop}>
+        Stop & Log
+      </button>
+      <button onClick={onDiscard} className={styles.timerBtnDiscard}>
+        Discard
+      </button>
+    </div>
+  );
 };
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('tasks');
   const { setOnline, activeTimer, tasks, stopTimer, discardTimer } = useStore();
-  const [isExpanded, setIsExpanded] = useState(false);
+
   const [showStopModal, setShowStopModal] = useState(false);
   const [timerNote, setTimerNote] = useState('');
 
@@ -100,14 +106,12 @@ export default function Dashboard() {
   const handleSaveTimerLog = () => {
     stopTimer(timerNote.trim());
     setShowStopModal(false);
-    setIsExpanded(false);
   };
 
   const handleDiscardClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (confirm('Are you sure you want to discard this timer session?')) {
       discardTimer();
-      setIsExpanded(false);
     }
   };
 
@@ -122,16 +126,26 @@ export default function Dashboard() {
         <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
       </div>
 
-      {/* Main Content Area */}
-      <main className={styles.mainContent}>
-        <div className={styles.tabContainer}>{renderActiveSection()}</div>
-      </main>
+      {/* Workspace Area: Timer bar + main content */}
+      <div className={styles.workspaceWrapper}>
+        {activeTimer && activeTask && (
+          <TimerBar
+            taskTitle={activeTask.title}
+            startedAt={activeTimer.startedAt}
+            onStop={handleStopClick}
+            onDiscard={handleDiscardClick}
+          />
+        )}
+        <main className={styles.mainContent}>
+          <div className={styles.tabContainer}>{renderActiveSection()}</div>
+        </main>
+      </div>
 
       {/* Floating Sparkle Button (FAB) */}
       {!isAiChatOpen && (
         <button
           onClick={() => setIsAiChatOpen(true)}
-          className={`${styles.floatingAiFab} ${activeTimer ? styles.fabWithTimer : ''}`}
+          className={styles.floatingAiFab}
           title="Open AI Q&A Assistant"
         >
           <Sparkles size={24} />
@@ -143,44 +157,6 @@ export default function Dashboard() {
         <AgentSection onClose={() => setIsAiChatOpen(false)} />
       )}
 
-      {/* Persistent Floating Timer Widget HUD */}
-      {activeTimer && activeTask && (
-        <div className={styles.floatingTimer}>
-          {!isExpanded ? (
-            <button
-              onClick={() => setIsExpanded(true)}
-              className={`${styles.floatingIcon} animate-pulse-glow`}
-              title={`Timer running: ${activeTask.title}. Click to expand.`}
-            >
-              <Clock size={24} className="animate-spin" style={{ animationDuration: '6s' }} />
-            </button>
-          ) : (
-            <div className={styles.floatingTimerExpanded}>
-              <div className={styles.expandedHeader}>
-                <span className={styles.taskTitle}>{activeTask.title}</span>
-                <button
-                  onClick={() => setIsExpanded(false)}
-                  style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
-                >
-                  <X size={16} />
-                </button>
-              </div>
-
-              <FloatingTimerDisplay startedAt={activeTimer.startedAt} />
-
-              <div className={styles.actionRow}>
-                <button onClick={handleStopClick} className={styles.btnStop}>
-                  <Square size={14} fill="currentColor" />
-                  Stop & Log
-                </button>
-                <button onClick={handleDiscardClick} className={styles.btnDiscard}>
-                  Discard
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Stop Timer Description Modal Overlay */}
       {showStopModal && (

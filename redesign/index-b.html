@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Goal Tracker — Redesign</title>
+<link rel="stylesheet" href="redesign.css">
+<style>
+/* Inline token snapshot for iframe/tool compatibility */
+:root {
+  --bg-base:#08080a; --bg-raised:#100f14; --bg-card:rgba(255,255,255,0.036);
+  --bg-card-hover:rgba(255,255,255,0.065); --bg-input:rgba(255,255,255,0.055);
+  --border:rgba(255,255,255,0.075); --border-strong:rgba(255,255,255,0.13);
+  --text-1:#f0f0f4; --text-2:rgba(240,240,244,0.55); --text-3:rgba(240,240,244,0.3);
+  --accent:#7c3aed; --accent-hover:#6d28d9; --accent-wash:rgba(124,58,237,0.14);
+  --accent-glow:0 0 28px rgba(124,58,237,0.45); --accent-text:#c4b5fd;
+  --success:#10b981; --success-light:rgba(16,185,129,0.14);
+  --warning:#f59e0b; --warning-light:rgba(245,158,11,0.14);
+  --danger:#ef4444; --danger-light:rgba(239,68,68,0.14);
+  --streak:#f97316; --info:#06b6d4;
+  --shadow-sm:0 1px 6px rgba(0,0,0,0.5); --shadow-md:0 4px 24px rgba(0,0,0,0.55);
+  --shadow-lg:0 16px 64px rgba(0,0,0,0.65);
+  --sidebar-w:240px; --nav-h:60px;
+  --r-xs:6px; --r-sm:9px; --r-md:13px; --r-lg:18px; --r-full:9999px;
+  --ease-out:cubic-bezier(0.16,1,0.3,1); --ease-smooth:cubic-bezier(0.2,0.8,0.2,1);
+  --ease-spring:cubic-bezier(0.34,1.56,0.64,1);
+  --dur-fast:0.18s; --dur-base:0.28s; --dur-slow:0.45s;
+}
+[data-theme="light"] {
+  --bg-base:#f7f7fa; --bg-raised:#ebebf0; --bg-card:#ffffff;
+  --bg-card-hover:#f5f5f8; --bg-input:#ffffff;
+  --border:rgba(15,15,20,0.08); --border-strong:rgba(15,15,20,0.14);
+  --text-1:#0f0f14; --text-2:rgba(15,15,20,0.55); --text-3:rgba(15,15,20,0.32);
+  --accent:#6d28d9; --accent-hover:#5b21b6; --accent-wash:rgba(109,40,217,0.1);
+  --accent-glow:0 0 24px rgba(109,40,217,0.28); --accent-text:#6d28d9;
+  --shadow-sm:0 1px 4px rgba(0,0,0,0.07); --shadow-md:0 4px 20px rgba(0,0,0,0.09);
+  --shadow-lg:0 16px 48px rgba(0,0,0,0.12);
+}
+</style>
+<style>
+  #root { height: 100vh; }
+  .shell { display:flex; width:100vw; height:100vh; overflow:hidden; }
+  /* Sidebar */
+  .sidebar { display:flex; flex-direction:column; justify-content:space-between; width:var(--sidebar-w); height:100vh; background:var(--bg-raised); border-right:1px solid var(--border); padding:22px 14px; flex-shrink:0; }
+  /* Main */
+  .main-area { flex:1; display:flex; flex-direction:column; height:100vh; min-width:0; overflow:hidden; }
+  /* Bottom nav (mobile) */
+  .bottom-nav { position:fixed; bottom:0; left:0; right:0; height:var(--nav-h); background:var(--bg-raised); border-top:1px solid var(--border); display:none; justify-content:space-around; align-items:center; z-index:100; backdrop-filter:blur(16px); }
+  /* AI Drawer */
+  .ai-drawer { position:fixed; top:0; right:0; bottom:0; width:380px; max-width:90vw; background:var(--bg-raised); border-left:1px solid var(--border); display:flex; flex-direction:column; z-index:200; box-shadow:var(--shadow-lg); transform:translateX(100%); transition:transform var(--dur-base) var(--ease-out); }
+  .ai-drawer.open { transform:translateX(0); }
+  .ai-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:199; opacity:0; pointer-events:none; transition:opacity var(--dur-base) ease; }
+  .ai-overlay.open { opacity:1; pointer-events:auto; }
+  /* FAB */
+  .fab { position:fixed; bottom:24px; right:24px; width:52px; height:52px; border-radius:50%; border:none; background:var(--accent); color:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:var(--accent-glow); transition:transform var(--dur-fast) ease; z-index:100; }
+  .fab:hover { transform:scale(1.1) rotate(8deg); }
+  @media (max-width:760px) {
+    .sidebar { display:none; }
+    .bottom-nav { display:flex; }
+    .main-area { height:calc(100vh - var(--nav-h)); }
+    .fab { bottom:calc(var(--nav-h) + 16px); }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="Icons.jsx"></script>
+<script type="text/babel" src="Auth.jsx"></script>
+<script type="text/babel" src="Tasks.jsx"></script>
+<script type="text/babel" src="Routines.jsx"></script>
+<script type="text/babel" src="Analytics.jsx"></script>
+<script type="text/babel">
+/* ─── AI Drawer ─────────────────────────────────────────── */
+function AiDrawer({ open, onClose }) {
+  const [msgs, setMsgs] = React.useState([
+    { role:'ai', text:'Hi! I can help you analyse your habits, plan your week, or reflect on your progress. What would you like to explore?' },
+  ]);
+  const [input, setInput] = React.useState('');
+  const endRef = React.useRef(null);
+  React.useEffect(() => { endRef.current?.scrollIntoView({ behavior:'smooth' }); }, [msgs]);
+
+  const send = () => {
+    if (!input.trim()) return;
+    const q = input.trim();
+    setInput('');
+    setMsgs(m => [...m, { role:'user', text:q }]);
+    setTimeout(() => {
+      setMsgs(m => [...m, { role:'ai', text:'Great question. Based on your recent activity, here\'s what I\'d suggest: keep your morning run streak strong — you\'re 23 days in! For your tasks, "Database sync tests" is flagged critical and due today.' }]);
+    }, 900);
+  };
+
+  return (
+    <>
+      <div className={`ai-overlay ${open ? 'open' : ''}`} onClick={onClose} />
+      <div className={`ai-drawer ${open ? 'open' : ''}`}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'20px 22px', borderBottom:'1px solid var(--border)', flexShrink:0 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+            <div style={{ width:32, height:32, borderRadius:'var(--r-sm)', background:'var(--accent)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <Ico.Sparkles size={16} style={{ color:'#fff' }} />
+            </div>
+            <span style={{ fontFamily:'Neuton, serif', fontSize:20, fontWeight:700, color:'var(--text-1)' }}>AI Assistant</span>
+          </div>
+          <button onClick={onClose} style={{ background:'none', border:'none', color:'var(--text-3)', cursor:'pointer', padding:4 }}>
+            <Ico.X size={18} />
+          </button>
+        </div>
+        <div style={{ flex:1, overflowY:'auto', padding:'18px 20px', display:'flex', flexDirection:'column', gap:14 }}>
+          {msgs.map((m, i) => (
+            <div key={i} style={{ display:'flex', justifyContent: m.role==='user' ? 'flex-end' : 'flex-start' }}>
+              <div style={{ maxWidth:'82%', padding:'11px 14px', borderRadius: m.role==='user' ? 'var(--r-md) var(--r-md) var(--r-xs) var(--r-md)' : 'var(--r-md) var(--r-md) var(--r-md) var(--r-xs)', background: m.role==='user' ? 'var(--accent)' : 'var(--bg-card)', border: m.role==='user' ? 'none' : '1px solid var(--border)', fontSize:13.5, color: m.role==='user' ? '#fff' : 'var(--text-1)', lineHeight:1.6 }}>
+                {m.text}
+              </div>
+            </div>
+          ))}
+          <div ref={endRef} />
+        </div>
+        <div style={{ padding:'14px 18px', borderTop:'1px solid var(--border)', flexShrink:0 }}>
+          <div style={{ display:'flex', gap:8, alignItems:'flex-end' }}>
+            <textarea value={input} onChange={e=>setInput(e.target.value)} placeholder="Ask anything about your goals…"
+              onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();} }}
+              rows={1}
+              style={{ flex:1, padding:'11px 14px', borderRadius:'var(--r-sm)', border:'1px solid var(--border-strong)', background:'var(--bg-input)', color:'var(--text-1)', fontSize:13.5, fontFamily:'DM Sans, sans-serif', outline:'none', resize:'none', lineHeight:1.5 }}
+              onFocus={e=>e.target.style.borderColor='var(--accent)'}
+              onBlur={e=>e.target.style.borderColor='var(--border-strong)'}
+            />
+            <button onClick={send} style={{ width:40, height:40, borderRadius:'var(--r-sm)', border:'none', background:'var(--accent)', color:'#fff', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+              <Ico.Send size={16} />
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+/* ─── Sidebar ────────────────────────────────────────────── */
+function Sidebar({ tab, setTab, theme, toggleTheme }) {
+  const nav = [
+    ['tasks','Task Timer', Ico.Clock],
+    ['routines','Daily Routines', Ico.CheckSquare],
+    ['analytics','Analytics', Ico.BarChart],
+  ];
+  return (
+    <aside className="sidebar">
+      <div style={{ display:'flex', flexDirection:'column', gap:28 }}>
+        {/* Logo */}
+        <div style={{ display:'flex', alignItems:'center', gap:11, paddingLeft:6 }}>
+          <div style={{ width:38, height:38, borderRadius:'var(--r-md)', background:'var(--accent)', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'var(--accent-glow)' }}>
+            <Ico.Compass size={20} style={{ color:'#fff' }} />
+          </div>
+          <span style={{ fontFamily:'Neuton, serif', fontSize:19, fontWeight:700, color:'var(--text-1)', letterSpacing:'-0.3px' }}>Goal Tracker</span>
+        </div>
+        {/* Nav */}
+        <nav style={{ display:'flex', flexDirection:'column', gap:4 }}>
+          {nav.map(([id, label, Icon]) => {
+            const active = tab === id;
+            return (
+              <button key={id} onClick={() => setTab(id)} style={{ display:'flex', alignItems:'center', gap:11, width:'100%', padding:'11px 14px', borderRadius:'var(--r-md)', border:'none', background: active ? 'var(--accent-wash)' : 'transparent', color: active ? 'var(--accent-text)' : 'var(--text-2)', fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:'inherit', transition:'all var(--dur-fast) var(--ease-smooth)', borderLeft: active ? '2px solid var(--accent)' : '2px solid transparent' }}
+                onMouseEnter={e=>{ if(!active){ e.currentTarget.style.background='rgba(255,255,255,0.04)'; e.currentTarget.style.color='var(--text-1)'; }}}
+                onMouseLeave={e=>{ if(!active){ e.currentTarget.style.background='transparent'; e.currentTarget.style.color='var(--text-2)'; }}}
+              >
+                <Icon size={17} />
+                {label}
+              </button>
+            );
+          })}
+        </nav>
+      </div>
+      {/* Bottom */}
+      <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:8, padding:'9px 12px', background:'rgba(255,255,255,0.03)', border:'1px solid var(--border)', borderRadius:'var(--r-md)', fontSize:12, color:'var(--text-3)' }}>
+          <span style={{ width:7, height:7, borderRadius:'50%', background:'var(--success)', flexShrink:0 }}/>
+          Synced to cloud
+        </div>
+        <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 10px', borderTop:'1px solid var(--border)' }}>
+          <div style={{ width:30, height:30, borderRadius:'50%', background:'var(--accent)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, boxShadow:'var(--accent-glow)' }}>
+            <span style={{ fontFamily:'Neuton, serif', fontSize:15, fontWeight:700, color:'#fff' }}>P</span>
+          </div>
+          <span style={{ flex:1, fontSize:13, fontWeight:600, color:'var(--text-1)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>Preet</span>
+          <button onClick={toggleTheme} title="Toggle theme" style={{ width:30, height:30, borderRadius:'var(--r-sm)', border:'1px solid var(--border)', background:'transparent', color:'var(--text-3)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+            {theme === 'light' ? <Ico.Moon size={14}/> : <Ico.Sun size={14}/>}
+          </button>
+          <button style={{ width:30, height:30, borderRadius:'var(--r-sm)', border:'1px solid var(--border)', background:'transparent', color:'var(--text-3)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <Ico.LogOut size={14}/>
+          </button>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+/* ─── Bottom nav (mobile) ────────────────────────────────── */
+function BottomNav({ tab, setTab }) {
+  const items = [['tasks',Ico.Clock,'Timer'],['routines',Ico.CheckSquare,'Routines'],['analytics',Ico.BarChart,'Analytics']];
+  return (
+    <nav className="bottom-nav">
+      {items.map(([id,Icon,label])=>(
+        <button key={id} onClick={()=>setTab(id)} style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4, background:'none', border:'none', color:tab===id?'var(--accent)':'var(--text-3)', fontSize:10, fontWeight:600, cursor:'pointer', fontFamily:'inherit', flex:1, height:'100%' }}>
+          <Icon size={20}/>{label}
+        </button>
+      ))}
+    </nav>
+  );
+}
+
+/* ─── App ────────────────────────────────────────────────── */
+function App() {
+  const [theme, setTheme] = React.useState(() => {
+    try { return localStorage.getItem('gt-theme') || ''; } catch { return ''; }
+  });
+  const toggleTheme = () => setTheme(t => {
+    const next = t === 'light' ? '' : 'light';
+    try { localStorage.setItem('gt-theme', next); } catch {}
+    return next;
+  });
+  React.useEffect(() => { document.documentElement.dataset.theme = theme; }, [theme]);
+
+  const [stage, setStage] = React.useState('auth'); // auth | onboard | app
+  const [tab, setTab] = React.useState('tasks');
+  const [runningId, setRunningId] = React.useState(null);
+  const [startedAt, setStartedAt] = React.useState(null);
+  const [aiOpen, setAiOpen] = React.useState(false);
+
+  const toggleTimer = (id) => {
+    if (id === null || runningId === id) { setRunningId(null); setStartedAt(null); }
+    else { setRunningId(id); setStartedAt(Date.now()); }
+  };
+
+  if (stage === 'auth') return <RAuthScreen onEnter={() => setStage('onboard')} />;
+  if (stage === 'onboard') return <ROnboardingScreen onComplete={() => setStage('app')} />;
+
+  return (
+    <div className="shell">
+      <Sidebar tab={tab} setTab={setTab} theme={theme} toggleTheme={toggleTheme} />
+      <div className="main-area">
+        {tab === 'tasks'    && <RTasksScreen runningId={runningId} startedAt={startedAt} onToggle={toggleTimer} />}
+        {tab === 'routines' && <RRoutinesScreen />}
+        {tab === 'analytics'&& <RAnalyticsScreen />}
+      </div>
+      <BottomNav tab={tab} setTab={setTab} />
+      <button className="fab" onClick={()=>setAiOpen(true)} title="AI Assistant"><Ico.Sparkles size={22}/></button>
+      <AiDrawer open={aiOpen} onClose={()=>setAiOpen(false)} />
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

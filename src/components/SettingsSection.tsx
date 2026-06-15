@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../store/useStore';
 import styles from './SettingsSection.module.css';
-import { Settings, Key, Cpu, Check, Eye, EyeOff, Sparkles } from 'lucide-react';
+import { Settings, Key, Cpu, Check, Eye, EyeOff, Sparkles, Moon, Sun } from 'lucide-react';
+import { useTheme } from '../hooks/useTheme';
 
 export default function SettingsSection() {
   const {
@@ -13,6 +14,7 @@ export default function SettingsSection() {
     setSelectedModel,
     chatThreads,
   } = useStore();
+  const { theme, toggleTheme } = useTheme();
 
   const [activeSubTab, setActiveSubTab] = useState<'habits' | 'ai' | 'usage'>('habits');
   const [apiKey, setApiKey] = useState('');
@@ -110,46 +112,89 @@ export default function SettingsSection() {
 
       {/* Tab content sections */}
       {activeSubTab === 'habits' && (
-        <div className={styles.settingsCard}>
-          <div className={styles.cardTitle}>
-            <Settings size={18} style={{ color: 'var(--color-primary)' }} />
-            <span>Habit Tracker Mode</span>
-          </div>
-          <p className={styles.cardDesc}>
-            Toggle between Steady (Consistent daily checklist) and Dynamic (Adaptive weekly scheduled focus) routine styles.
-          </p>
-
-          <div className={styles.modeGrid}>
-            <div
-              className={`${styles.modeOption} ${lifestyleMode === 'steady' ? styles.modeOptionActive : ''}`}
-              onClick={() => {
-                setLifestyleMode('steady');
-                showStatus('Switched to Steady Routine Mode.', 'success');
-              }}
-            >
-              <div className={styles.modeHeader}>
-                <span className={styles.modeLabel}>Steady Routine</span>
-                {lifestyleMode === 'steady' && <Check size={16} className={styles.activeCheck} />}
-              </div>
-              <p className={styles.modeDescription}>
-                Perfect for a fixed 9-to-5 schedule. Tracks habits daily in a single straightforward list to optimize streak counts.
-              </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div className={styles.settingsCard}>
+            <div className={styles.cardTitle}>
+              <Settings size={18} style={{ color: 'var(--color-primary)' }} />
+              <span>Habit Tracker Mode</span>
             </div>
+            <p className={styles.cardDesc}>
+              Toggle between Steady (Consistent daily checklist) and Dynamic (Adaptive weekly scheduled focus) routine styles.
+            </p>
 
-            <div
-              className={`${styles.modeOption} ${lifestyleMode === 'dynamic' ? styles.modeOptionActive : ''}`}
-              onClick={() => {
-                setLifestyleMode('dynamic');
-                showStatus('Switched to Dynamic Routine Mode.', 'success');
-              }}
-            >
-              <div className={styles.modeHeader}>
-                <span className={styles.modeLabel}>Dynamic Routine</span>
-                {lifestyleMode === 'dynamic' && <Check size={16} className={styles.activeCheck} />}
+            <div className={styles.modeGrid}>
+              <div
+                className={`${styles.modeOption} ${lifestyleMode === 'steady' ? styles.modeOptionActive : ''}`}
+                onClick={() => {
+                  setLifestyleMode('steady');
+                  showStatus('Switched to Steady Routine Mode.', 'success');
+                }}
+              >
+                <div className={styles.modeHeader}>
+                  <span className={styles.modeLabel}>Steady Routine</span>
+                  {lifestyleMode === 'steady' && <Check size={16} className={styles.activeCheck} />}
+                </div>
+                <p className={styles.modeDescription}>
+                  Perfect for a fixed 9-to-5 schedule. Tracks habits daily in a single straightforward list to optimize streak counts.
+                </p>
               </div>
-              <p className={styles.modeDescription}>
-                Perfect for students or hybrid workers. Schedule habits on specific weekdays with flexible presets, splitting focus between daily anchors and scheduled goals.
-              </p>
+
+              <div
+                className={`${styles.modeOption} ${lifestyleMode === 'dynamic' ? styles.modeOptionActive : ''}`}
+                onClick={() => {
+                  setLifestyleMode('dynamic');
+                  showStatus('Switched to Dynamic Routine Mode.', 'success');
+                }}
+              >
+                <div className={styles.modeHeader}>
+                  <span className={styles.modeLabel}>Dynamic Routine</span>
+                  {lifestyleMode === 'dynamic' && <Check size={16} className={styles.activeCheck} />}
+                </div>
+                <p className={styles.modeDescription}>
+                  Perfect for students or hybrid workers. Schedule habits on specific weekdays with flexible presets, splitting focus between daily anchors and scheduled goals.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className={styles.settingsCard}>
+            <div className={styles.cardTitle}>
+              {theme === 'light' ? <Sun size={18} style={{ color: 'var(--color-warning)' }} /> : <Moon size={18} style={{ color: 'var(--color-primary)' }} />}
+              <span>App Appearance</span>
+            </div>
+            <p className={styles.cardDesc}>
+              Select your visual theme preference. Dark mode is default.
+            </p>
+            <div className={styles.modeGrid}>
+              <div
+                className={`${styles.modeOption} ${theme === 'dark' ? styles.modeOptionActive : ''}`}
+                onClick={() => {
+                  if (theme === 'light') toggleTheme();
+                }}
+              >
+                <div className={styles.modeHeader}>
+                  <span className={styles.modeLabel}>Dark Theme</span>
+                  {theme === 'dark' && <Check size={16} className={styles.activeCheck} />}
+                </div>
+                <p className={styles.modeDescription}>
+                  Default dark aesthetic. Soft on the eyes, featuring deep violet highlights and subtle glowing panels.
+                </p>
+              </div>
+
+              <div
+                className={`${styles.modeOption} ${theme === 'light' ? styles.modeOptionActive : ''}`}
+                onClick={() => {
+                  if (theme === 'dark') toggleTheme();
+                }}
+              >
+                <div className={styles.modeHeader}>
+                  <span className={styles.modeLabel}>Light Theme</span>
+                  {theme === 'light' && <Check size={16} className={styles.activeCheck} />}
+                </div>
+                <p className={styles.modeDescription}>
+                  Clean, highly-scannable light gray canvas, offering a sharp aesthetic for brightly lit environments.
+                </p>
+              </div>
             </div>
           </div>
         </div>

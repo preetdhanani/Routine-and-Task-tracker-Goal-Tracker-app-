@@ -4,7 +4,8 @@ import React from 'react';
 import { useStore } from '../store/useStore';
 import { supabase } from '../lib/supabase';
 import styles from './Sidebar.module.css';
-import { Compass, CheckSquare, Clock, BarChart2, LogOut, RefreshCw, AlertCircle, Settings } from 'lucide-react';
+import { Compass, CheckSquare, Clock, BarChart2, LogOut, RefreshCw, AlertCircle, Settings, Sun, Moon } from 'lucide-react';
+import { useTheme } from '../hooks/useTheme';
 
 interface SidebarProps {
   activeTab: string;
@@ -13,6 +14,7 @@ interface SidebarProps {
 
 export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
   const { user, isGuestMode, syncQueue, isSyncing, isOnline, setUser, setGuestMode, clearLocalData } = useStore();
+  const { theme, toggleTheme } = useTheme();
 
   const getAvatarInitials = () => {
     if (isGuestMode) return 'G';
@@ -126,6 +128,13 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
             </div>
           </div>
           <div className={styles.userActions}>
+            <button
+              onClick={toggleTheme}
+              className={styles.themeBtn}
+              title={theme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
+            >
+              {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
+            </button>
             <button
               onClick={() => setActiveTab('settings')}
               className={`${styles.settingsBtn} ${activeTab === 'settings' ? styles.activeSettingsBtn : ''}`}
