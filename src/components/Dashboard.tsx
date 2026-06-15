@@ -120,43 +120,47 @@ export default function Dashboard() {
   const [isAiChatOpen, setIsAiChatOpen] = useState(false);
 
   return (
-    <div className={styles.dashboardShell}>
-      {/* Sidebar - Desktop & Tablet */}
-      <div className={styles.sidebarWrapper}>
-        <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
-      </div>
+    <>
+      <div className={styles.dashboardShell}>
+        {/* Sidebar - Desktop & Tablet */}
+        <div className={styles.sidebarWrapper}>
+          <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+        </div>
 
-      {/* Workspace Area: Timer bar + main content */}
-      <div className={styles.workspaceWrapper}>
-        {activeTimer && activeTask && (
-          <TimerBar
-            taskTitle={activeTask.title}
-            startedAt={activeTimer.startedAt}
-            onStop={handleStopClick}
-            onDiscard={handleDiscardClick}
-          />
+        {/* Workspace Area: Timer bar + main content */}
+        <div className={styles.workspaceWrapper}>
+          {activeTimer && activeTask && (
+            <TimerBar
+              taskTitle={activeTask.title}
+              startedAt={activeTimer.startedAt}
+              onStop={handleStopClick}
+              onDiscard={handleDiscardClick}
+            />
+          )}
+          <main className={styles.mainContent}>
+            <div className={styles.tabContainer}>{renderActiveSection()}</div>
+          </main>
+        </div>
+
+        {/* Floating Sparkle Button (FAB) */}
+        {!isAiChatOpen && (
+          <button
+            onClick={() => setIsAiChatOpen(true)}
+            className={styles.floatingAiFab}
+            title="Open AI Q&A Assistant"
+          >
+            <Sparkles size={24} />
+          </button>
         )}
-        <main className={styles.mainContent}>
-          <div className={styles.tabContainer}>{renderActiveSection()}</div>
-        </main>
-      </div>
 
-      {/* Floating Sparkle Button (FAB) */}
-      {!isAiChatOpen && (
-        <button
-          onClick={() => setIsAiChatOpen(true)}
-          className={styles.floatingAiFab}
-          title="Open AI Q&A Assistant"
-        >
-          <Sparkles size={24} />
-        </button>
-      )}
+        {/* Bottom Nav - Mobile */}
+        <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
+      </div>
 
       {/* AI Q&A Assistant Modal Overlay */}
       {isAiChatOpen && (
         <AgentSection onClose={() => setIsAiChatOpen(false)} />
       )}
-
 
       {/* Stop Timer Description Modal Overlay */}
       {showStopModal && (
@@ -167,17 +171,19 @@ export default function Dashboard() {
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.4)',
+            backgroundColor: 'rgba(0, 0, 0, 0.45)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             zIndex: 10000,
             padding: '16px',
+            backdropFilter: 'blur(4px)',
           }}
         >
           <div
             style={{
-              backgroundColor: 'white',
+              backgroundColor: 'var(--bg-canvas)',
+              border: '1px solid var(--border-subtle)',
               padding: '30px',
               borderRadius: 'var(--radius-md)',
               width: '100%',
@@ -204,6 +210,8 @@ export default function Dashboard() {
                 padding: '12px 16px',
                 borderRadius: 'var(--radius-sm)',
                 border: '1px solid var(--border-strong)',
+                backgroundColor: 'var(--bg-card)',
+                color: 'var(--text-primary)',
                 fontSize: '14px',
               }}
               autoFocus
@@ -218,6 +226,7 @@ export default function Dashboard() {
                   padding: '10px 16px',
                   backgroundColor: 'var(--bg-sidebar)',
                   border: '1px solid var(--border-strong)',
+                  color: 'var(--text-primary)',
                   borderRadius: 'var(--radius-sm)',
                   cursor: 'pointer',
                   fontWeight: 600,
@@ -245,9 +254,6 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-
-      {/* Bottom Nav - Mobile */}
-      <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
-    </div>
+    </>
   );
 }
