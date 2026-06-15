@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { useStore, Task } from '../store/useStore';
+import { useStore, Task, Subtask } from '../store/useStore';
 import styles from './TasksSection.module.css';
-import { Play, Square, Plus, Trash2, Check, ChevronDown, ChevronUp, X } from 'lucide-react';
+import { Play, Square, Plus, Trash2, Check, ChevronDown, ChevronUp, X, Pencil } from 'lucide-react';
 
 const dailyQuotes = [
   { text: "Karmanye vadhikaraste ma phaleshu kadachana (You have a right to perform your prescribed duties, but you are not entitled to the fruits of your actions.)", author: "Lord Krishna", book: "Bhagavad Gita / Mahabharata" },
@@ -85,10 +85,12 @@ export default function TasksSection({ onStopTimer }: TasksSectionProps) {
     activeTimer,
     addTask,
     updateTaskStatus,
+    updateTask,
     deleteTask,
     addSubtask,
     toggleSubtask,
     deleteSubtask,
+    updateSubtask,
     addGoal,
     deleteGoal,
     startTimer,
@@ -150,6 +152,64 @@ export default function TasksSection({ onStopTimer }: TasksSectionProps) {
   
   // Accordion card expansion
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
+
+  // Editing state for Tasks
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [editTaskTitle, setEditTaskTitle] = useState('');
+  const [editTaskDesc, setEditTaskDesc] = useState('');
+  const [editTaskDueDate, setEditTaskDueDate] = useState('');
+  const [editTaskPriority, setEditTaskPriority] = useState<'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'>('MEDIUM');
+
+  // Editing state for Subtasks (Milestones)
+  const [editingSubtaskId, setEditingSubtaskId] = useState<string | null>(null);
+  const [editingSubtaskTitle, setEditingSubtaskTitle] = useState('');
+
+  const handleToggleExpand = (taskId: string) => {
+    setExpandedTaskId((prev) => {
+      const next = prev === taskId ? null : taskId;
+      setEditingTaskId(null);
+      setEditingSubtaskId(null);
+      return next;
+    });
+  };
+
+  const handleStartTaskEdit = (task: Task) => {
+    setEditingTaskId(task.id);
+    setEditTaskTitle(task.title);
+    setEditTaskDesc(task.description || '');
+    setEditTaskDueDate(task.dueDate || '');
+    setEditTaskPriority(task.priority || 'MEDIUM');
+  };
+
+  const handleSaveTaskEdit = () => {
+    if (!editingTaskId || !editTaskTitle.trim()) return;
+    updateTask(editingTaskId, {
+      title: editTaskTitle.trim(),
+      description: editTaskDesc.trim(),
+      dueDate: editTaskDueDate || undefined,
+      priority: editTaskPriority,
+    });
+    setEditingTaskId(null);
+  };
+
+  const handleCancelTaskEdit = () => {
+    setEditingTaskId(null);
+  };
+
+  const handleStartSubtaskEdit = (subtask: Subtask) => {
+    setEditingSubtaskId(subtask.id);
+    setEditingSubtaskTitle(subtask.title);
+  };
+
+  const handleSaveSubtaskEdit = (subtaskId: string) => {
+    if (!editingSubtaskTitle.trim()) return;
+    updateSubtask(subtaskId, editingSubtaskTitle.trim());
+    setEditingSubtaskId(null);
+  };
+
+  const handleCancelSubtaskEdit = () => {
+    setEditingSubtaskId(null);
+  };
 
   // Filters
   const [statusFilter, setStatusFilter] = useState<'all' | 'todo' | 'in_progress' | 'completed'>('all');
@@ -249,6 +309,8 @@ export default function TasksSection({ onStopTimer }: TasksSectionProps) {
       deleteTask(taskId);
       if (expandedTaskId === taskId) {
         setExpandedTaskId(null);
+        setEditingTaskId(null);
+        setEditingSubtaskId(null);
       }
     }
   };
@@ -520,7 +582,7 @@ export default function TasksSection({ onStopTimer }: TasksSectionProps) {
             return (
               <div
                 key={task.id}
-                onClick={() => setExpandedTaskId(isExpanded ? null : task.id)}
+                onClick={() => handleToggleExpand(task.id)}
                 className={`${styles.taskCard} glass-panel ${isTicking ? styles.taskActiveCard : ''}`}
               >
                 {/* Compact Top view always visible */}
@@ -602,8 +664,60 @@ export default function TasksSection({ onStopTimer }: TasksSectionProps) {
                 {/* Accordion expanding details area */}
                 <div className={`${styles.cardDetails} ${isExpanded ? styles.cardDetailsExpanded : ''}`} onClick={(e) => e.stopPropagation()}>
                   
-                  {task.description && (
-                    <p className={styles.taskDescription}>{task.description}</p>
+                  {editingTaskId === task.id ? (
+                    <div className={styles.editForm}>
+                      <div className={styles.editField}>
+                        <label>Task Title</label>
+                        <input
+                          type="text"
+                          value={editTaskTitle}
+                          onChange={(e) => setEditTaskTitle(e.target.value)}
+                          className={styles.editInput}
+                        />
+                      </div>
+                      <div className={styles.editField}>
+                        <label>Description</label>
+                        <textarea
+                          value={editTaskDesc}
+                          onChange={(e) => setEditTaskDesc(e.target.value)}
+                          className={styles.editTextarea}
+                        />
+                      </div>
+                      <div className={styles.editRow}>
+                        <div className={styles.editField} style={{ flex: 1 }}>
+                          <label>Due Date</label>
+                          <input
+                            type="date"
+                            value={editTaskDueDate}
+                            onChange={(e) => setEditTaskDueDate(e.target.value)}
+                            className={styles.editInput}
+                          />
+                        </div>
+                        <div className={styles.editField} style={{ flex: 1 }}>
+                          <label>Priority</label>
+                          <select
+                            value={editTaskPriority}
+                             onChange={(e) => setEditTaskPriority(e.target.value as 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL')}
+                            className={styles.editSelect}
+                          >
+                            <option value="LOW">Low</option>
+                            <option value="MEDIUM">Medium</option>
+                            <option value="HIGH">High</option>
+                            <option value="CRITICAL">Critical</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div className={styles.editActions}>
+                        <button onClick={handleSaveTaskEdit} className={styles.saveBtn}>Save Changes</button>
+                        <button onClick={handleCancelTaskEdit} className={styles.cancelBtn}>Cancel</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      {task.description && (
+                        <p className={styles.taskDescription}>{task.description}</p>
+                      )}
+                    </>
                   )}
 
                   {/* Subtasks Checklist */}
@@ -614,17 +728,57 @@ export default function TasksSection({ onStopTimer }: TasksSectionProps) {
                     <div className={styles.subtaskList}>
                       {taskSubtasks.map((st) => (
                         <div key={st.id} className={styles.subtaskItem}>
-                          <div onClick={() => toggleSubtask(st.id)} className={styles.subtaskMain}>
-                            <div className={`${styles.subtaskCheck} ${st.is_completed ? styles.subtaskChecked : ''}`}>
-                              {st.is_completed && <Check size={10} strokeWidth={3} />}
-                            </div>
-                            <span className={st.is_completed ? styles.subtaskTitleCompleted : ''}>
-                              {st.title}
-                            </span>
-                          </div>
-                          <button onClick={() => deleteSubtask(st.id)} className={styles.subtaskDeleteBtn}>
-                            <Trash2 size={12} />
-                          </button>
+                          {editingSubtaskId === st.id ? (
+                            <form
+                              onSubmit={(e) => {
+                                e.preventDefault();
+                                handleSaveSubtaskEdit(st.id);
+                              }}
+                              className={styles.subtaskEditForm}
+                            >
+                              <input
+                                type="text"
+                                value={editingSubtaskTitle}
+                                onChange={(e) => setEditingSubtaskTitle(e.target.value)}
+                                className={styles.subtaskEditInput}
+                                autoFocus
+                              />
+                              <button type="submit" className={styles.subtaskSaveBtn} title="Save">
+                                <Check size={12} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={handleCancelSubtaskEdit}
+                                className={styles.subtaskCancelBtn}
+                                title="Cancel"
+                              >
+                                <X size={12} />
+                              </button>
+                            </form>
+                          ) : (
+                            <>
+                              <div onClick={() => toggleSubtask(st.id)} className={styles.subtaskMain}>
+                                <div className={`${styles.subtaskCheck} ${st.is_completed ? styles.subtaskChecked : ''}`}>
+                                  {st.is_completed && <Check size={10} strokeWidth={3} />}
+                                </div>
+                                <span className={st.is_completed ? styles.subtaskTitleCompleted : ''}>
+                                  {st.title}
+                                </span>
+                              </div>
+                              <div className={styles.subtaskActions}>
+                                <button
+                                  onClick={() => handleStartSubtaskEdit(st)}
+                                  className={styles.subtaskEditBtn}
+                                  title="Edit Milestone"
+                                >
+                                  <Pencil size={12} />
+                                </button>
+                                <button onClick={() => deleteSubtask(st.id)} className={styles.subtaskDeleteBtn} title="Delete Milestone">
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
+                            </>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -708,10 +862,25 @@ export default function TasksSection({ onStopTimer }: TasksSectionProps) {
                       </button>
                     </div>
 
-                    <button onClick={(e) => handleDeleteTask(task.id, e)} className={styles.deleteTaskBtn} title="Delete Task">
-                      <Trash2 size={14} style={{ marginRight: '4px' }} />
-                      Delete
-                    </button>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      {editingTaskId !== task.id && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleStartTaskEdit(task);
+                          }}
+                          className={styles.editTaskToggleBtn}
+                          title="Edit Task Details"
+                        >
+                          <Pencil size={12} style={{ marginRight: '4px' }} />
+                          Edit Details
+                        </button>
+                      )}
+                      <button onClick={(e) => handleDeleteTask(task.id, e)} className={styles.deleteTaskBtn} title="Delete Task">
+                        <Trash2 size={14} style={{ marginRight: '4px' }} />
+                        Delete
+                      </button>
+                    </div>
                   </div>
                 </div>
 

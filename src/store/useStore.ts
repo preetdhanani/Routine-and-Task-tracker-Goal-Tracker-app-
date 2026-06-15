@@ -10,6 +10,7 @@ export interface Routine {
   category: string;
   is_active: boolean;
   created_at: string;
+  schedule?: number[]; // [0-6] where 0=Sunday, 1=Monday, etc.
 }
 
 export interface RoutineLog {
@@ -99,6 +100,8 @@ export interface UserProfile {
 interface GoalTrackerState {
   user: UserProfile | null;
   isGuestMode: boolean;
+  lifestyleMode: 'steady' | 'dynamic' | null;
+  setLifestyleMode: (mode: 'steady' | 'dynamic') => void;
   routines: Routine[];
   routineLogs: RoutineLog[];
   tasks: Task[];
@@ -116,10 +119,10 @@ interface GoalTrackerState {
   setOnline: (online: boolean) => void;
   
   // Routine Actions
-  addRoutine: (title: string, category: string) => void;
+  addRoutine: (title: string, category: string, schedule?: number[]) => void;
   toggleRoutine: (routineId: string, dateStr: string) => void;
   deleteRoutine: (routineId: string) => void;
-  updateRoutine: (routineId: string, title: string) => void;
+  updateRoutine: (routineId: string, title: string, category?: string, schedule?: number[]) => void;
   
   // Task Actions
   addTask: (title: string, description: string, dueDate?: string, priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL', subtaskTitles?: string[]) => void;
@@ -131,6 +134,7 @@ interface GoalTrackerState {
   addSubtask: (taskId: string, title: string) => void;
   toggleSubtask: (subtaskId: string) => void;
   deleteSubtask: (subtaskId: string) => void;
+  updateSubtask: (subtaskId: string, title: string) => void;
 
   // Goal Actions
   addGoal: (title: string, description: string, targetDate?: string) => void;
@@ -174,10 +178,10 @@ const getPastDateString = (daysAgo: number): string => {
 };
 
 const initialMockRoutines: Routine[] = [
-  { id: 'm-r1', title: 'Drink 3L Water', category: 'Health', is_active: true, created_at: new Date().toISOString() },
-  { id: 'm-r2', title: 'Morning Meditation', category: 'Mindset', is_active: true, created_at: new Date().toISOString() },
-  { id: 'm-r3', title: 'Read 20 Pages', category: 'Learning', is_active: true, created_at: new Date().toISOString() },
-  { id: 'm-r4', title: '15 Mins Cardio Workout', category: 'Fitness', is_active: true, created_at: new Date().toISOString() },
+  { id: 'm-r1', title: 'Drink 3L Water', category: 'Health', is_active: true, created_at: new Date().toISOString(), schedule: [0, 1, 2, 3, 4, 5, 6] },
+  { id: 'm-r2', title: 'Morning Meditation', category: 'Mindset', is_active: true, created_at: new Date().toISOString(), schedule: [0, 1, 2, 3, 4, 5, 6] },
+  { id: 'm-r3', title: 'Read 20 Pages', category: 'Learning', is_active: true, created_at: new Date().toISOString(), schedule: [0, 1, 2, 3, 4, 5, 6] },
+  { id: 'm-r4', title: '15 Mins Cardio Workout', category: 'Fitness', is_active: true, created_at: new Date().toISOString(), schedule: [0, 1, 2, 3, 4, 5, 6] },
 ];
 
 const generateMockRoutineLogs = (): RoutineLog[] => {
@@ -240,6 +244,8 @@ export const useStore = create<GoalTrackerState>()(
     (set, get) => ({
       user: null,
       isGuestMode: false,
+      lifestyleMode: null,
+      setLifestyleMode: (mode) => set({ lifestyleMode: mode }),
       routines: initialMockRoutines,
       routineLogs: generateMockRoutineLogs(),
       tasks: initialMockTasks,
@@ -290,7 +296,7 @@ export const useStore = create<GoalTrackerState>()(
       },
 
       // --- Routines Actions ---
-      addRoutine: (title, category) => {
+      addRoutine: (title, category, schedule) => {
         const newRoutine: Routine = {
           id: `r-${crypto.randomUUID()}`,
           user_id: get().user?.id,
@@ -298,6 +304,7 @@ export const useStore = create<GoalTrackerState>()(
           category,
           is_active: true,
           created_at: new Date().toISOString(),
+          schedule: schedule || [0, 1, 2, 3, 4, 5, 6],
         };
 
         set((state) => ({
@@ -358,11 +365,33 @@ export const useStore = create<GoalTrackerState>()(
         get().processSyncQueue();
       },
 
-      updateRoutine: (routineId, title) => {
+      updateRoutine: (routineId, title, category, schedule) => {
         set((state) => ({
-          routines: state.routines.map((r) => (r.id === routineId ? { ...r, title } : r)),
+          routines: state.routines.map((r) =>
+            r.id === routineId
+              ? {
+                  ...r,
+                  title,
+                  category: category || r.category,
+                  schedule: schedule || r.schedule || [0, 1, 2, 3, 4, 5, 6],
+                }
+              : r
+          ),
           syncQueue: state.user
-            ? [...state.syncQueue, { id: crypto.randomUUID(), action: 'update', table: 'routines', payload: { id: routineId, title } } as SyncAction]
+            ? [
+                ...state.syncQueue,
+                {
+                  id: crypto.randomUUID(),
+                  action: 'update',
+                  table: 'routines',
+                  payload: {
+                    id: routineId,
+                    title,
+                    category: category || undefined,
+                    schedule: schedule || undefined,
+                  },
+                } as SyncAction,
+              ]
             : state.syncQueue,
         }));
 
@@ -559,6 +588,17 @@ export const useStore = create<GoalTrackerState>()(
         get().processSyncQueue();
       },
 
+      updateSubtask: (subtaskId, title) => {
+        set((state) => ({
+          subtasks: state.subtasks.map((st) => (st.id === subtaskId ? { ...st, title } : st)),
+          syncQueue: state.user
+            ? [...state.syncQueue, { id: crypto.randomUUID(), action: 'update', table: 'task_subtasks', payload: { id: subtaskId, title } }]
+            : state.syncQueue,
+        }));
+
+        get().processSyncQueue();
+      },
+
       // --- Goal Actions ---
       addGoal: (title, description, targetDate) => {
         const newGoal: Goal = {
@@ -710,6 +750,10 @@ export const useStore = create<GoalTrackerState>()(
               if (dueDate !== undefined) {
                 payloadToSync.due_date = dueDate || null;
               }
+            } else if (table === 'routines') {
+              const payloadCopy = { ...payload };
+              delete payloadCopy.schedule;
+              payloadToSync = payloadCopy;
             }
 
             if (op === 'insert') {
@@ -848,6 +892,7 @@ export const useStore = create<GoalTrackerState>()(
 
       clearLocalData: () => {
         set({
+          lifestyleMode: null,
           routines: [],
           routineLogs: [],
           tasks: [],
@@ -1397,6 +1442,7 @@ export const useStore = create<GoalTrackerState>()(
       partialize: (state) => ({
         user: state.user,
         isGuestMode: state.isGuestMode,
+        lifestyleMode: state.lifestyleMode,
         routines: state.routines,
         routineLogs: state.routineLogs,
         tasks: state.tasks,

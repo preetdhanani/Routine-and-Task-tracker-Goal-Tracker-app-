@@ -134,6 +134,28 @@ describe('Zustand State Store (useStore)', () => {
       deleteTask(task.id);
       expect(useStore.getState().tasks).toHaveLength(0);
     });
+
+    it('should add, toggle, update, and delete subtasks', () => {
+      const { addTask, addSubtask, toggleSubtask, updateSubtask, deleteSubtask } = useStore.getState();
+      addTask('Parent Task', 'Desc');
+      const task = useStore.getState().tasks[0];
+
+      addSubtask(task.id, 'Subtask 1');
+      expect(useStore.getState().subtasks).toHaveLength(1);
+      expect(useStore.getState().subtasks[0].title).toBe('Subtask 1');
+      expect(useStore.getState().subtasks[0].is_completed).toBe(false);
+
+      const subtask = useStore.getState().subtasks[0];
+
+      toggleSubtask(subtask.id);
+      expect(useStore.getState().subtasks[0].is_completed).toBe(true);
+
+      updateSubtask(subtask.id, 'Updated Subtask Title');
+      expect(useStore.getState().subtasks[0].title).toBe('Updated Subtask Title');
+
+      deleteSubtask(subtask.id);
+      expect(useStore.getState().subtasks).toHaveLength(0);
+    });
   });
 
   // --- Daily Routines Tests ---
@@ -164,6 +186,16 @@ describe('Zustand State Store (useStore)', () => {
       // 2. Toggle OFF: Removes completion log
       toggleRoutine(routine.id, todayStr);
       expect(useStore.getState().routineLogs).toHaveLength(0);
+    });
+
+    it('should update a routine title and category', () => {
+      const { addRoutine, updateRoutine } = useStore.getState();
+      addRoutine('Original Title', 'Health');
+      const routine = useStore.getState().routines[0];
+
+      updateRoutine(routine.id, 'New Title', 'Work');
+      expect(useStore.getState().routines[0].title).toBe('New Title');
+      expect(useStore.getState().routines[0].category).toBe('Work');
     });
   });
 
