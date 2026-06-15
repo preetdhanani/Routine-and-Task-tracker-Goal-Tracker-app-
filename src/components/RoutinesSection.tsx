@@ -94,39 +94,55 @@ const RoutineCard = ({
     }
   };
 
+  const getCategoryColor = (cat: string) => {
+    switch (cat?.toLowerCase()) {
+      case 'health': return 'var(--color-info)';
+      case 'fitness': return 'var(--color-danger)';
+      case 'mindset': return 'var(--color-primary)';
+      case 'learning': return 'var(--color-warning)';
+      default: return 'var(--text-muted)';
+    }
+  };
+
   const handleTouchStart = (e: React.TouchEvent) => {
     if (isEditing) return;
     setTouchStart({
       x: e.touches[0].clientX,
       y: e.touches[0].clientY,
     });
-    setIsSwiping(false);
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
     if (isEditing) return;
-    const diffX = e.touches[0].clientX - touchStart.x;
-    const diffY = e.touches[0].clientY - touchStart.y;
-
-    // Detect horizontal swipe dominance
-    if (Math.abs(diffX) > Math.abs(diffY)) {
-      setIsSwiping(true);
-      // Dampen swipe drag past limits
-      let val = diffX;
-      if (diffX > 140) val = 140 + (diffX - 140) * 0.2;
-      if (diffX < -140) val = -140 + (diffX + 140) * 0.2;
-      setSwipeX(val);
-
-      // Prevent scroll only when swiping horizontally
-      if (e.cancelable) e.preventDefault();
+    const currentX = e.touches[0].clientX;
+    const currentY = e.touches[0].clientY;
+    const diffX = currentX - touchStart.x;
+    const diffY = currentY - touchStart.y;
+    
+    // Determine if user is swiping horizontally or vertically
+    if (!isSwiping) {
+      if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 10) {
+        setIsSwiping(true);
+      } else if (Math.abs(diffY) > 10) {
+        return;
+      }
+    }
+    
+    if (isSwiping) {
+      // Elastic resistance
+      if (diffX > 0) {
+        setSwipeX(diffX * 0.5);
+      } else {
+        setSwipeX(diffX * 0.75);
+      }
     }
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
     if (isEditing) return;
     if (isSwiping) {
-      if (swipeX > 90) {
-        // Swipe Right -> Complete/Toggle
+      if (swipeX > 80) {
+        // Swipe Right -> Complete
         // Get target coordinates for confetti particle burst
         const x = e.changedTouches[0].clientX;
         const y = e.changedTouches[0].clientY;
@@ -137,7 +153,7 @@ const RoutineCard = ({
           setTimeout(() => setIsAnimatingCheck(false), 400);
         }
         onToggle(routine.id, todayStr);
-      } else if (swipeX < -90) {
+      } else if (swipeX < -80) {
         // Swipe Left -> Delete
         if (confirm(`Delete routine "${routine.title}"?`)) {
           onDelete(routine.id);
@@ -182,6 +198,16 @@ const RoutineCard = ({
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
+        {/* Category color vertical stripe */}
+        <div style={{
+          position: 'absolute',
+          left: 0,
+          top: 0,
+          bottom: 0,
+          width: '4px',
+          backgroundColor: getCategoryColor(routine.category),
+          zIndex: 3,
+        }} />
         {isEditing ? (
           <form
             onSubmit={(e) => {

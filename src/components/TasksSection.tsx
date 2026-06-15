@@ -585,6 +585,18 @@ export default function TasksSection({ onStopTimer }: TasksSectionProps) {
                 onClick={() => handleToggleExpand(task.id)}
                 className={`${styles.taskCard} glass-panel ${isTicking ? styles.taskActiveCard : ''}`}
               >
+                {/* Priority vertical stripe */}
+                <div style={{
+                  position: 'absolute',
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: '4px',
+                  backgroundColor: task.priority === 'CRITICAL' ? 'var(--color-danger)' :
+                                   task.priority === 'HIGH' ? 'var(--color-warning)' :
+                                   task.priority === 'MEDIUM' ? 'var(--color-primary)' :
+                                   'var(--text-muted)',
+                }} />
                 {/* Compact Top view always visible */}
                 <div className={styles.taskTop}>
                   <div className={styles.taskMeta} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '4px' }}>

@@ -58,6 +58,8 @@ const ProgressRing = ({ percentage, color, size = 64, strokeWidth = 6 }: Progres
   );
 };
 
+const SEGMENT_COLORS = ['var(--color-primary)', 'var(--color-success)', 'var(--color-info)', 'var(--color-warning)'];
+
 export default function AnalyticsSection() {
   const { tasks, routines, routineLogs, taskTimeLogs, deleteTimeLog } = useStore();
   const [timeRange, setTimeRange] = useState<'today' | '7d' | '30d'>('7d');
@@ -167,7 +169,6 @@ export default function AnalyticsSection() {
   };
 
   const segments = getSegmentedData();
-  const segmentColors = ['var(--color-primary)', 'var(--color-success)', 'var(--color-info)', 'var(--color-warning)'];
 
   // Add percentage metrics to segments
   const formattedSegments = segments.map((seg, idx) => {
@@ -175,7 +176,7 @@ export default function AnalyticsSection() {
     return {
       ...seg,
       pct,
-      color: segmentColors[idx % segmentColors.length],
+      color: SEGMENT_COLORS[idx % SEGMENT_COLORS.length],
     };
   });
 
@@ -198,9 +199,10 @@ export default function AnalyticsSection() {
     chartData.sort((a, b) => b.seconds - a.seconds);
     const maxSeconds = chartData.length > 0 ? chartData[0].seconds : 0;
 
-    return chartData.slice(0, 4).map((item) => ({
+    return chartData.slice(0, 4).map((item, idx) => ({
       ...item,
       pctWidth: maxSeconds > 0 ? (item.seconds / maxSeconds) * 100 : 0,
+      color: SEGMENT_COLORS[idx % SEGMENT_COLORS.length],
     }));
   };
 
@@ -332,7 +334,7 @@ export default function AnalyticsSection() {
                     <span className={styles.taskHours}>{item.hours.toFixed(2)}h</span>
                   </div>
                   <div className={styles.barTrack}>
-                    <div className={styles.barFill} style={{ width: `${item.pctWidth}%` }} />
+                    <div className={styles.barFill} style={{ width: `${item.pctWidth}%`, background: item.color }} />
                   </div>
                 </div>
               ))}
