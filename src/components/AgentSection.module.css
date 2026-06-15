@@ -484,14 +484,14 @@
   overflow-x: auto;
   padding: 12px 24px;
   border-top: 1px solid var(--border-subtle);
-  background-color: white;
+  background-color: var(--bg-sidebar);
 }
 
 .chip {
   padding: 6px 12px;
   border-radius: var(--radius-full);
-  border: 1px solid var(--border-strong);
-  background-color: white;
+  border: 1px solid var(--border-subtle);
+  background-color: var(--bg-card);
   font-size: 12px;
   color: var(--text-secondary);
   font-weight: 600;
@@ -510,7 +510,7 @@
 .inputPanel {
   display: flex;
   padding: 16px 24px;
-  background-color: white;
+  background-color: var(--bg-sidebar);
   border-top: 1px solid var(--border-subtle);
   gap: 12px;
 }
@@ -519,7 +519,9 @@
   flex: 1;
   padding: 12px 16px;
   border-radius: var(--radius-md);
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--border-subtle);
+  background-color: var(--bg-card);
+  color: var(--text-primary);
   font-size: 14px;
   transition: border-color 0.2s ease;
 }
@@ -643,7 +645,8 @@
 }
 
 .tokenModalContent {
-  background-color: white;
+  background-color: var(--bg-canvas);
+  border: 1px solid var(--border-subtle);
   padding: 24px;
   border-radius: var(--radius-md);
   width: 100%;
@@ -689,7 +692,7 @@
 }
 
 .settingsBtnActive {
-  background-color: white !important;
+  background-color: var(--bg-card) !important;
   color: var(--color-primary) !important;
   box-shadow: var(--shadow-sm);
   border: 1px solid var(--border-subtle);
@@ -703,11 +706,11 @@
   display: flex;
   flex-direction: column;
   gap: 20px;
-  background-color: rgba(250, 250, 250, 0.4);
+  background-color: var(--bg-canvas);
 }
 
 .settingsSection {
-  background-color: white;
+  background-color: var(--bg-card);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   padding: 20px;
@@ -788,10 +791,10 @@
 .filterSelect {
   padding: 4px 8px;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--border-subtle);
   font-size: 12px;
   font-weight: 700;
-  background-color: white;
+  background-color: var(--bg-card);
   color: var(--text-primary);
   cursor: pointer;
   max-width: 150px;
