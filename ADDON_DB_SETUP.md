@@ -7,11 +7,11 @@ To support the new Goal entity, task deadlines, priority levels, and task depend
 ALTER TABLE public.tasks 
 ADD COLUMN IF NOT EXISTS due_date DATE,
 ADD COLUMN IF NOT EXISTS priority TEXT DEFAULT 'MEDIUM' CHECK (priority IN ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL')),
-ADD COLUMN IF NOT EXISTS depends_on_task_id UUID REFERENCES public.tasks(id) ON DELETE SET NULL;
+ADD COLUMN IF NOT EXISTS depends_on_task_id TEXT REFERENCES public.tasks(id) ON DELETE SET NULL;
 
 -- 2. Create Goals Table
 CREATE TABLE IF NOT EXISTS public.goals (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id TEXT PRIMARY KEY,
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     title TEXT NOT NULL,
     description TEXT DEFAULT '' NOT NULL,
