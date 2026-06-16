@@ -751,9 +751,7 @@ export const useStore = create<GoalTrackerState>()(
                 payloadToSync.due_date = dueDate || null;
               }
             } else if (table === 'routines') {
-              const payloadCopy = { ...payload };
-              delete payloadCopy.schedule;
-              payloadToSync = payloadCopy;
+              payloadToSync = payload;
             }
 
             if (op === 'insert') {
