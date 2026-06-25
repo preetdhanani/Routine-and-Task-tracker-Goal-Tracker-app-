@@ -600,16 +600,78 @@
   }
 }
 
-/* Action feedback banner */
-.actionBanner {
+/* Collapsible Feedback Accordion */
+.feedbackAccordion {
   background-color: var(--color-success-light);
   border-bottom: 1px solid rgba(16, 185, 129, 0.15);
-  color: var(--color-success);
-  padding: 12px 24px;
+  display: flex;
+  flex-direction: column;
+  animation: fadeIn 0.3s ease;
+}
+
+.feedbackHeader {
   display: flex;
   align-items: center;
-  gap: 10px;
-  animation: fadeIn 0.3s ease;
+  padding: 10px 24px;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.2s ease;
+}
+
+.feedbackHeader:hover {
+  background-color: rgba(16, 185, 129, 0.08);
+}
+
+.feedbackTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-success);
+}
+
+.feedbackExpandTrigger {
+  display: flex;
+  align-items: center;
+  margin-left: 12px;
+  color: var(--color-success);
+  opacity: 0.8;
+}
+
+.feedbackCloseBtn {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--color-success);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 4px;
+  opacity: 0.8;
+  transition: opacity 0.2s ease, background-color 0.2s ease;
+}
+
+.feedbackCloseBtn:hover {
+  opacity: 1;
+  background-color: rgba(16, 185, 129, 0.15);
+}
+
+.feedbackContent {
+  padding: 12px 24px 16px 44px;
+  max-height: 180px;
+  overflow-y: auto;
+  border-top: 1px dashed rgba(16, 185, 129, 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background-color: rgba(16, 185, 129, 0.02);
+}
+
+.feedbackItem {
+  font-size: 12px;
+  color: var(--color-success);
+  opacity: 0.9;
+  line-height: 1.4;
 }
 
 /* Token Usage overlay */

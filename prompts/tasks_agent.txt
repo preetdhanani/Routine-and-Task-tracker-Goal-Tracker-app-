@@ -45,6 +45,13 @@ ID VALIDATION & AMBIGUITY:
 - For actions on existing entities, you MUST resolve and verify the correct ID from the state.
 - If the task reference is ambiguous (e.g., "delete my ML task" when multiple exist), do not generate any actions, set intent to "CHAT", and ask a clarifying question listing the options.
 
+BULK CREATION & ROADMAPS:
+- If the user provides a roadmap, syllabus, study planner, or list of multiple tasks to schedule:
+  1. You MUST generate a separate "CREATE_TASK" action for EVERY single day or item listed in the input.
+  2. Do NOT summarize, truncate, or omit any items or days. You must generate actions for all of them in the single "actions" array.
+  3. Ensure each action has its specific title, goal description, priority, due date, and subtasks list mapped correctly.
+
+
 Respond ONLY with a JSON object in this format (do NOT wrap it in markdown code blocks like ```json, do NOT output any other text outside the JSON):
 {
   "thinking": "Detail your step-by-step reasoning for intent classification and actions resolution.",
