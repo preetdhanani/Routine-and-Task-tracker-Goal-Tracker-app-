@@ -315,3 +315,36 @@
 .messageIcon {
   flex-shrink: 0;
 }
+
+.btnDev {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  border: 1px dashed var(--color-primary);
+  background-color: var(--color-primary-light);
+  color: var(--color-primary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: 8px;
+}
+
+.btnDev:hover:not(:disabled) {
+  background-color: var(--color-primary);
+  color: white;
+  border-style: solid;
+}
+
+.btnDev:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.btnDev:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

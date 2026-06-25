@@ -13,6 +13,14 @@ export default function AuthSection() {
   const [otpSent, setOtpSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [isLocalhost, setIsLocalhost] = useState(false);
+
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const hostname = window.location.hostname;
+      setIsLocalhost(hostname === 'localhost' || hostname === '127.0.0.1');
+    }
+  }, []);
 
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -93,6 +101,64 @@ export default function AuthSection() {
     }
   };
 
+  const handleDevLogin = async () => {
+    if (!supabase) return;
+    setLoading(true);
+    setMessage(null);
+
+    const devEmail = process.env.NEXT_PUBLIC_DEV_EMAIL || 'dev@goaltracker.local';
+    const devPassword = process.env.NEXT_PUBLIC_DEV_PASSWORD || 'DevPassword123!';
+
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: devEmail,
+        password: devPassword,
+      });
+
+      if (error) {
+        // If login fails, try to sign up in case RLS / email confirm allows it
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+          email: devEmail,
+          password: devPassword,
+          options: {
+            data: {
+              username: 'Dev User',
+              birthdate: '1990-01-01',
+            }
+          }
+        });
+
+        if (signUpError) {
+          throw new Error(
+            `Dev sign-in failed. Please verify that you created the user "${devEmail}" in your Supabase Auth Console (Authentication -> Users -> Add User) with "Auto Confirm User" enabled. Error: ${error.message}`
+          );
+        }
+
+        if (signUpData.user) {
+          setMessage({ type: 'success', text: 'Dev account registered! Logging you in...' });
+          setUser({
+            id: signUpData.user.id,
+            email: signUpData.user.email || '',
+            username: 'Dev User',
+            birthdate: '1990-01-01',
+          });
+        }
+      } else if (data.user) {
+        setUser({
+          id: data.user.id,
+          email: data.user.email || '',
+          username: data.user.user_metadata?.username || 'Dev User',
+          birthdate: data.user.user_metadata?.birthdate || '1990-01-01',
+        });
+      }
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : 'Dev login failed.';
+      setMessage({ type: 'error', text: errMsg });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className={styles.container}>
       {/* Background ambient orbs */}
@@ -163,6 +229,18 @@ export default function AuthSection() {
                   >
                     Continue as Guest
                   </button>
+
+                  {isLocalhost && (
+                    <button
+                      type="button"
+                      onClick={handleDevLogin}
+                      className={styles.btnDev}
+                      disabled={loading}
+                    >
+                      <Sparkles size={18} style={{ color: 'var(--color-primary)' }} />
+                      Dev Sign In (Local Only)
+                    </button>
+                  )}
                 </form>
               ) : (
                 <form onSubmit={handleVerifyOtp} className={styles.form}>
