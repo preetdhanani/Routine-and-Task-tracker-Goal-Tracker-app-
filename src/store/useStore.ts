@@ -80,6 +80,7 @@ export interface AgentChatMessage {
     reasoning: number;
     total: number;
   } | null;
+  feedback?: string[];
 }
 
 export interface ChatThread {
@@ -280,18 +281,19 @@ export const useStore = create<GoalTrackerState>()(
       selectedModel: 'gemini-3.5-flash',
       setSelectedModel: (model) => set({ selectedModel: model }),
 
-      setUser: (user) => {
+      setUser: async (user) => {
         set({ user, isGuestMode: user ? false : get().isGuestMode });
         if (user) {
-          get().fetchUserData();
-          get().processSyncQueue();
+          await get().processSyncQueue();
+          await get().fetchUserData();
         }
       },
       setGuestMode: (enabled) => set({ isGuestMode: enabled, user: enabled ? null : get().user }),
-      setOnline: (online) => {
+      setOnline: async (online) => {
         set({ isOnline: online });
         if (online && get().user) {
-          get().processSyncQueue();
+          await get().processSyncQueue();
+          await get().fetchUserData();
         }
       },
 
@@ -727,84 +729,211 @@ export const useStore = create<GoalTrackerState>()(
       // --- Offline Sync Logic ---
       processSyncQueue: async () => {
         const { syncQueue, isSyncing, isOnline, user } = get();
+        const client = supabase;
 
         // Prevent concurrent syncs, or run only if online and authenticated
-        if (isSyncing || !isOnline || !user || !supabase || syncQueue.length === 0) return;
+        if (isSyncing || !isOnline || !user || !client || syncQueue.length === 0) return;
 
         set({ isSyncing: true });
 
-        const queueCopy = [...syncQueue];
-        let processedCount = 0;
+        const isNetworkError = (err: any): boolean => {
+          if (!err) return false;
+          const msg = err.message || '';
+          return (
+            msg.includes('Failed to fetch') ||
+            msg.includes('NetworkError') ||
+            msg.includes('fetch') ||
+            err.status === 0 ||
+            err.code === 'TypeError'
+          );
+        };
 
-        for (const action of queueCopy) {
-          try {
-            const { table, action: op, payload } = action;
-            let error = null;
+        try {
+          while (true) {
+            const currentQueue = get().syncQueue;
+            if (currentQueue.length === 0) break;
 
-            let payloadToSync = payload;
-            if (table === 'tasks') {
-              const { dueDate, ...rest } = payload;
-              payloadToSync = {
-                ...rest,
+            const queueCopy = [...currentQueue];
+            const processedActionIds = new Set<string>();
+            let networkErrorToThrow: any = null;
+
+            try {
+              const insertsByTable: Record<string, { actionId: string; payload: any }[]> = {};
+              const deletesByTable: Record<string, { actionId: string; id: string }[]> = {};
+              const updatesList: { actionId: string; table: string; payload: any }[] = [];
+
+              for (const action of queueCopy) {
+                const { id: actionId, table, action: op, payload } = action;
+                if (op === 'insert') {
+                  if (!insertsByTable[table]) insertsByTable[table] = [];
+                  insertsByTable[table].push({ actionId, payload });
+                } else if (op === 'delete') {
+                  if (!deletesByTable[table]) deletesByTable[table] = [];
+                  deletesByTable[table].push({ actionId, id: payload.id });
+                } else if (op === 'update') {
+                  updatesList.push({ actionId, table, payload });
+                }
+              }
+
+              // Helper for individual deletes fallback
+              const fallbackDeleteIndividual = async (table: string, items: { actionId: string; id: string }[]) => {
+                for (const item of items) {
+                  const { error } = await client.from(table).delete().eq('id', item.id);
+                  if (error) {
+                    if (isNetworkError(error)) throw error;
+                    console.error(`Failed to delete individual row ${item.id} from ${table}:`, error);
+                  }
+                  processedActionIds.add(item.actionId);
+                }
               };
-              if (dueDate !== undefined) {
-                payloadToSync.due_date = dueDate || null;
-              }
-            } else if (table === 'routines') {
-              payloadToSync = payload;
-            }
 
-            if (op === 'insert') {
-              const { error: err } = await supabase.from(table).insert(payloadToSync);
-              error = err;
-            } else if (op === 'update') {
-              const { error: err } = await supabase.from(table).update(payloadToSync).eq('id', payload.id);
-              error = err;
-            } else if (op === 'delete') {
-              const { error: err } = await supabase.from(table).delete().eq('id', payload.id);
-              error = err;
-            }
-
-            if (error) {
-              const isNetworkError = error.message && (
-                error.message.includes('Failed to fetch') || 
-                error.message.includes('NetworkError') ||
-                error.message.includes('fetch')
-              );
+              // 1. Run Deletes in reverse dependency order (child tables first)
+              const DELETE_ORDER = ['task_subtasks', 'task_time_logs', 'routine_logs', 'tasks', 'routines', 'goals'];
               
-              if (isNetworkError) {
-                console.warn(`Sync paused: network connection is currently unreachable (${error.message}). Will retry when connection stabilizes.`);
-              } else {
-                console.error(`Error syncing action ${action.id} to ${table}:`, error.message, error.details, error.hint || '');
+              for (const table of Object.keys(deletesByTable)) {
+                if (!DELETE_ORDER.includes(table)) {
+                  const items = deletesByTable[table];
+                  const idsToDelete = items.map(item => item.id);
+                  try {
+                    const { error } = await client.from(table).delete().in('id', idsToDelete);
+                    if (error) throw error;
+                    items.forEach(item => processedActionIds.add(item.actionId));
+                  } catch (err: any) {
+                    if (isNetworkError(err)) throw err;
+                    console.warn(`Batch delete failed for table ${table}, falling back to individual deletes:`, err);
+                    await fallbackDeleteIndividual(table, items);
+                  }
+                }
               }
-              // Stop processing on error to preserve order (KISS transaction safety)
+
+              for (const table of DELETE_ORDER) {
+                const items = deletesByTable[table];
+                if (items && items.length > 0) {
+                  const idsToDelete = items.map(item => item.id);
+                  try {
+                    const { error } = await client.from(table).delete().in('id', idsToDelete);
+                    if (error) throw error;
+                    items.forEach(item => processedActionIds.add(item.actionId));
+                  } catch (err: any) {
+                    if (isNetworkError(err)) throw err;
+                    console.warn(`Batch delete failed for table ${table}, falling back to individual deletes:`, err);
+                    await fallbackDeleteIndividual(table, items);
+                  }
+                }
+              }
+
+              // 2. Run Updates individually
+              for (const update of updatesList) {
+                const { actionId, table, payload } = update;
+                let payloadToSync = payload;
+                if (table === 'tasks') {
+                  const { dueDate, ...rest } = payload;
+                  payloadToSync = { ...rest };
+                  if (dueDate !== undefined) {
+                    payloadToSync.due_date = dueDate || null;
+                  }
+                }
+                try {
+                  const { error } = await client.from(table).update(payloadToSync).eq('id', payload.id);
+                  if (error) throw error;
+                  processedActionIds.add(actionId);
+                } catch (err: any) {
+                  if (isNetworkError(err)) throw err;
+                  console.error(`Failed to update row ${payload.id} in ${table}:`, err);
+                  processedActionIds.add(actionId); // Discard poison pill
+                }
+              }
+
+              // Helper for individual inserts fallback
+              const fallbackInsertIndividual = async (table: string, items: { actionId: string; payload: any }[], getPayloadFn: (p: any) => any) => {
+                for (const item of items) {
+                  const p = getPayloadFn(item.payload);
+                  const { error } = await client.from(table).insert(p);
+                  if (error) {
+                    if (isNetworkError(error)) throw error;
+                    console.error(`Failed to insert individual row into ${table}:`, error, p);
+                  }
+                  processedActionIds.add(item.actionId);
+                }
+              };
+
+              // 3. Run Inserts in dependency order (parent tables first)
+              const INSERT_ORDER = ['goals', 'routines', 'tasks', 'task_subtasks', 'task_time_logs', 'routine_logs'];
+
+              for (const table of Object.keys(insertsByTable)) {
+                if (!INSERT_ORDER.includes(table)) {
+                  const items = insertsByTable[table];
+                  const payloads = items.map(item => item.payload);
+                  try {
+                    const { error } = await client.from(table).insert(payloads);
+                    if (error) throw error;
+                    items.forEach(item => processedActionIds.add(item.actionId));
+                  } catch (err: any) {
+                    if (isNetworkError(err)) throw err;
+                    console.warn(`Batch insert failed for table ${table}, falling back to individual inserts:`, err);
+                    await fallbackInsertIndividual(table, items, (p) => p);
+                  }
+                }
+              }
+
+              for (const table of INSERT_ORDER) {
+                const items = insertsByTable[table];
+                if (items && items.length > 0) {
+                  const getCleanedPayload = (p: any) => {
+                    let cleaned = p;
+                    if (table === 'tasks') {
+                      const { dueDate, ...rest } = p;
+                      cleaned = { ...rest };
+                      if (dueDate !== undefined) {
+                        cleaned.due_date = dueDate || null;
+                      }
+                    }
+                    return cleaned;
+                  };
+
+                  const payloads = items.map(item => getCleanedPayload(item.payload));
+                  try {
+                    const { error } = await client.from(table).insert(payloads);
+                    if (error) throw error;
+                    items.forEach(item => processedActionIds.add(item.actionId));
+                  } catch (err: any) {
+                    if (isNetworkError(err)) throw err;
+                    console.warn(`Batch insert failed for table ${table}, falling back to individual inserts:`, err);
+                    await fallbackInsertIndividual(table, items, getCleanedPayload);
+                  }
+                }
+              }
+
+            } catch (err: any) {
+              if (isNetworkError(err)) {
+                networkErrorToThrow = err;
+              } else {
+                console.error('Failed to sync batch actions due to unexpected error:', err);
+              }
+            }
+
+            // Always update syncQueue with whatever was successfully processed before exiting/looping
+            if (processedActionIds.size > 0) {
+              set((state) => ({
+                syncQueue: state.syncQueue.filter(action => !processedActionIds.has(action.id)),
+              }));
+            }
+
+            // If we encountered a network error, throw it now so that outer try-catch stops processing
+            if (networkErrorToThrow) {
+              throw networkErrorToThrow;
+            }
+
+            // If we didn't process any items in this iteration, break to prevent infinite loop
+            if (processedActionIds.size === 0) {
               break;
             }
-
-            processedCount++;
-          } catch (err) {
-            const isNetworkError = err instanceof Error && (
-              err.message.includes('Failed to fetch') || 
-              err.message.includes('NetworkError') ||
-              err.message.includes('fetch')
-            );
-            
-            if (isNetworkError) {
-              console.warn(`Sync paused: network connection is currently unreachable (${err.message}). Will retry when connection stabilizes.`);
-            } else {
-              console.error('Failed to sync action due to connection exception:', err);
-            }
-            break;
           }
+        } catch (err: any) {
+          console.warn(`Sync paused: network connection is currently unreachable (${err.message}). Will retry when connection stabilizes.`);
+        } finally {
+          set({ isSyncing: false });
         }
-
-        if (processedCount > 0) {
-          set((state) => ({
-            syncQueue: state.syncQueue.slice(processedCount),
-          }));
-        }
-
-        set({ isSyncing: false });
       },
 
       fetchUserData: async () => {
@@ -1257,28 +1386,9 @@ export const useStore = create<GoalTrackerState>()(
             throw new Error(`Chat API failed: ${err instanceof Error ? err.message : String(err)}`);
           }
 
-          // 2. Append Agent response text
-          get().addMessageToActiveThread({
-            id: `a-${crypto.randomUUID()}`,
-            sender: 'agent',
-            text: responseData.content?.reply || 'Request processed successfully.',
-            model: responseData.modelName,
-            thinking: responseData.content?.thinking || '',
-          });
-
-          // 3. Save token usage metadata
-          if (responseData.usage) {
-            get().updateActiveThreadTokenUsage({
-              input: responseData.usage.promptTokenCount || 0,
-              output: responseData.usage.candidatesTokenCount || 0,
-              reasoning: responseData.usage.thoughtsTokenCount || 0,
-              total: responseData.usage.totalTokenCount || 0,
-            });
-          }
-
-          // 4. Execute actions
+          // 2. Execute actions and collect feedback
+          const actionFeedbacks: string[] = [];
           if (responseData.content?.actions && Array.isArray(responseData.content.actions)) {
-            const actionFeedbacks: string[] = [];
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             responseData.content.actions.forEach((act: any) => {
               if (act.type === 'CREATE_TASK' && act.payload?.title) {
@@ -1416,6 +1526,26 @@ export const useStore = create<GoalTrackerState>()(
               }
             });
             set({ aiFeedback: actionFeedbacks });
+          }
+
+          // 3. Append Agent response text with feedback accordion data
+          get().addMessageToActiveThread({
+            id: `a-${crypto.randomUUID()}`,
+            sender: 'agent',
+            text: responseData.content?.reply || 'Request processed successfully.',
+            model: responseData.modelName,
+            thinking: responseData.content?.thinking || '',
+            feedback: actionFeedbacks.length > 0 ? actionFeedbacks : undefined,
+          });
+
+          // 4. Save token usage metadata
+          if (responseData.usage) {
+            get().updateActiveThreadTokenUsage({
+              input: responseData.usage.promptTokenCount || 0,
+              output: responseData.usage.candidatesTokenCount || 0,
+              reasoning: responseData.usage.thoughtsTokenCount || 0,
+              total: responseData.usage.totalTokenCount || 0,
+            });
           }
 
         } catch (err) {

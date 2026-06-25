@@ -27,6 +27,7 @@ export default function AgentSection({ onClose }: AgentSectionProps) {
   } = useStore();
 
   const [inputText, setInputText] = useState('');
+  const [isFeedbackExpanded, setIsFeedbackExpanded] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   
   // Local state for API Key
@@ -39,6 +40,7 @@ export default function AgentSection({ onClose }: AgentSectionProps) {
 
   // Local state to track expanded thought processes (message ID -> boolean)
   const [expandedThoughts, setExpandedThoughts] = useState<Record<string, boolean>>({});
+  const [expandedFeedbacks, setExpandedFeedbacks] = useState<Record<string, boolean>>({});
 
   // Dynamic thinking phase state during loading
   const [thinkingPhase, setThinkingPhase] = useState('Routing request...');
@@ -80,6 +82,23 @@ export default function AgentSection({ onClose }: AgentSectionProps) {
       [msgId]: !prev[msgId]
     }));
   };
+
+  const toggleFeedback = (msgId: string) => {
+    setExpandedFeedbacks(prev => ({
+      ...prev,
+      [msgId]: !prev[msgId]
+    }));
+  };
+
+  // Auto-dismiss global feedback banner after 6 seconds to prevent screen clutter
+  useEffect(() => {
+    if (aiFeedback.length > 0) {
+      const timer = setTimeout(() => {
+        clearAiFeedback();
+      }, 6000);
+      return () => clearTimeout(timer);
+    }
+  }, [aiFeedback, clearAiFeedback]);
 
   useEffect(() => {
     const savedKey = localStorage.getItem('goal_tracker_gemini_key') || '';
@@ -242,21 +261,35 @@ export default function AgentSection({ onClose }: AgentSectionProps) {
 
         {/* Action triggers feedback */}
         {aiFeedback.length > 0 && !showSettings && (
-          <div className={styles.actionBanner}>
-            <Check size={14} />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-              {aiFeedback.map((f, idx) => (
-                <span key={idx} style={{ fontSize: '12px', fontWeight: 600 }}>{f}</span>
-              ))}
+          <div className={styles.feedbackAccordion}>
+            <div className={styles.feedbackHeader} onClick={() => setIsFeedbackExpanded(!isFeedbackExpanded)}>
+              <Check size={14} style={{ color: 'var(--color-success)', marginRight: '8px', flexShrink: 0 }} />
+              <span className={styles.feedbackTitle}>
+                {aiFeedback.length} action{aiFeedback.length > 1 ? 's' : ''} applied successfully
+              </span>
+              <span className={styles.feedbackExpandTrigger}>
+                {isFeedbackExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              </span>
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  clearAiFeedback();
+                }} 
+                className={styles.feedbackCloseBtn}
+                title="Dismiss feedback"
+              >
+                <X size={14} />
+              </button>
             </div>
-            <button 
-              onClick={clearAiFeedback} 
-              className={styles.threadDeleteBtn}
-              style={{ marginLeft: 'auto', opacity: 1, color: 'var(--color-success)' }}
-              title="Dismiss feedback"
-            >
-              <X size={14} />
-            </button>
+            {isFeedbackExpanded && (
+              <div className={styles.feedbackContent}>
+                {aiFeedback.map((f, idx) => (
+                  <div key={idx} className={styles.feedbackItem}>
+                    • {f}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -505,6 +538,32 @@ export default function AgentSection({ onClose }: AgentSectionProps) {
                             {expandedThoughts[msg.id] && (
                               <div className={styles.thoughtContent}>
                                 {msg.thinking}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {msg.feedback && msg.feedback.length > 0 && (
+                          <div className={styles.thoughtAccordion} style={{ borderLeftColor: 'var(--color-success)' }}>
+                            <button
+                              onClick={() => toggleFeedback(msg.id)}
+                              className={styles.thoughtHeader}
+                              style={{ color: 'var(--color-success)' }}
+                            >
+                              <Check size={12} className={styles.thoughtBrainIcon} style={{ color: 'var(--color-success)' }} />
+                              <span className={styles.thoughtHeaderText}>Actions Applied ({msg.feedback.length})</span>
+                              {expandedFeedbacks[msg.id] ? (
+                                <ChevronUp size={12} className={styles.thoughtChevron} style={{ color: 'var(--color-success)' }} />
+                              ) : (
+                                <ChevronDown size={12} className={styles.thoughtChevron} style={{ color: 'var(--color-success)' }} />
+                              )}
+                            </button>
+                            {expandedFeedbacks[msg.id] && (
+                              <div className={styles.thoughtContent} style={{ borderColor: 'rgba(16, 185, 129, 0.2)', backgroundColor: 'rgba(16, 185, 129, 0.03)', fontStyle: 'normal' }}>
+                                {msg.feedback.map((f, fIdx) => (
+                                  <div key={fIdx} style={{ fontSize: '11px', color: 'var(--color-success)', marginBottom: '4px' }}>
+                                    • {f}
+                                  </div>
+                                ))}
                               </div>
                             )}
                           </div>
