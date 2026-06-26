@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase';
 import AuthSection from '../components/AuthSection';
 import Dashboard from '../components/Dashboard';
 import OnboardingSection from '../components/OnboardingSection';
+import GuestWelcomeSection from '../components/GuestWelcomeSection';
 
 // Custom hook to ensure Zustand store hydration has completed on the client
 function useHasHydrated() {
@@ -32,6 +33,7 @@ function useHasHydrated() {
 export default function Home() {
   const { user, isGuestMode, setUser } = useStore();
   const hasHydrated = useHasHydrated();
+  const [guestNoticeAcknowledged, setGuestNoticeAcknowledged] = useState(false);
 
   // Listen for Supabase Authentication state changes
   useEffect(() => {
@@ -85,6 +87,10 @@ export default function Home() {
     
     if (isProfileIncomplete) {
       return <OnboardingSection />;
+    }
+    
+    if (isGuestMode && !guestNoticeAcknowledged) {
+      return <GuestWelcomeSection onEnter={() => setGuestNoticeAcknowledged(true)} />;
     }
     
     return <Dashboard />;
