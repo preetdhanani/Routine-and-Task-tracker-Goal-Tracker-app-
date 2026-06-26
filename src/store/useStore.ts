@@ -736,15 +736,18 @@ export const useStore = create<GoalTrackerState>()(
 
         set({ isSyncing: true });
 
-        const isNetworkError = (err: any): boolean => {
+        const isNetworkError = (err: unknown): boolean => {
           if (!err) return false;
-          const msg = err.message || '';
+          const errorObj = err as Record<string, unknown>;
+          const msg = typeof errorObj.message === 'string' ? errorObj.message : '';
+          const status = typeof errorObj.status === 'number' ? errorObj.status : undefined;
+          const code = typeof errorObj.code === 'string' ? errorObj.code : '';
           return (
             msg.includes('Failed to fetch') ||
             msg.includes('NetworkError') ||
             msg.includes('fetch') ||
-            err.status === 0 ||
-            err.code === 'TypeError'
+            status === 0 ||
+            code === 'TypeError'
           );
         };
 
@@ -755,23 +758,24 @@ export const useStore = create<GoalTrackerState>()(
 
             const queueCopy = [...currentQueue];
             const processedActionIds = new Set<string>();
-            let networkErrorToThrow: any = null;
+            let networkErrorToThrow: unknown = null;
 
             try {
-              const insertsByTable: Record<string, { actionId: string; payload: any }[]> = {};
+              const insertsByTable: Record<string, { actionId: string; payload: Record<string, unknown> }[]> = {};
               const deletesByTable: Record<string, { actionId: string; id: string }[]> = {};
-              const updatesList: { actionId: string; table: string; payload: any }[] = [];
+              const updatesList: { actionId: string; table: string; payload: Record<string, unknown> }[] = [];
 
               for (const action of queueCopy) {
                 const { id: actionId, table, action: op, payload } = action;
+                const payloadRecord = payload as Record<string, unknown>;
                 if (op === 'insert') {
                   if (!insertsByTable[table]) insertsByTable[table] = [];
-                  insertsByTable[table].push({ actionId, payload });
+                  insertsByTable[table].push({ actionId, payload: payloadRecord });
                 } else if (op === 'delete') {
                   if (!deletesByTable[table]) deletesByTable[table] = [];
-                  deletesByTable[table].push({ actionId, id: payload.id });
+                  deletesByTable[table].push({ actionId, id: String(payloadRecord.id) });
                 } else if (op === 'update') {
-                  updatesList.push({ actionId, table, payload });
+                  updatesList.push({ actionId, table, payload: payloadRecord });
                 }
               }
 
@@ -798,7 +802,7 @@ export const useStore = create<GoalTrackerState>()(
                     const { error } = await client.from(table).delete().in('id', idsToDelete);
                     if (error) throw error;
                     items.forEach(item => processedActionIds.add(item.actionId));
-                  } catch (err: any) {
+                  } catch (err: unknown) {
                     if (isNetworkError(err)) throw err;
                     console.warn(`Batch delete failed for table ${table}, falling back to individual deletes:`, err);
                     await fallbackDeleteIndividual(table, items);
@@ -814,7 +818,7 @@ export const useStore = create<GoalTrackerState>()(
                     const { error } = await client.from(table).delete().in('id', idsToDelete);
                     if (error) throw error;
                     items.forEach(item => processedActionIds.add(item.actionId));
-                  } catch (err: any) {
+                  } catch (err: unknown) {
                     if (isNetworkError(err)) throw err;
                     console.warn(`Batch delete failed for table ${table}, falling back to individual deletes:`, err);
                     await fallbackDeleteIndividual(table, items);
@@ -837,7 +841,7 @@ export const useStore = create<GoalTrackerState>()(
                   const { error } = await client.from(table).update(payloadToSync).eq('id', payload.id);
                   if (error) throw error;
                   processedActionIds.add(actionId);
-                } catch (err: any) {
+                } catch (err: unknown) {
                   if (isNetworkError(err)) throw err;
                   console.error(`Failed to update row ${payload.id} in ${table}:`, err);
                   processedActionIds.add(actionId); // Discard poison pill
@@ -845,7 +849,11 @@ export const useStore = create<GoalTrackerState>()(
               }
 
               // Helper for individual inserts fallback
-              const fallbackInsertIndividual = async (table: string, items: { actionId: string; payload: any }[], getPayloadFn: (p: any) => any) => {
+              const fallbackInsertIndividual = async (
+                table: string, 
+                items: { actionId: string; payload: Record<string, unknown> }[], 
+                getPayloadFn: (p: Record<string, unknown>) => Record<string, unknown>
+              ) => {
                 for (const item of items) {
                   const p = getPayloadFn(item.payload);
                   const { error } = await client.from(table).insert(p);
@@ -868,7 +876,7 @@ export const useStore = create<GoalTrackerState>()(
                     const { error } = await client.from(table).insert(payloads);
                     if (error) throw error;
                     items.forEach(item => processedActionIds.add(item.actionId));
-                  } catch (err: any) {
+                  } catch (err: unknown) {
                     if (isNetworkError(err)) throw err;
                     console.warn(`Batch insert failed for table ${table}, falling back to individual inserts:`, err);
                     await fallbackInsertIndividual(table, items, (p) => p);
@@ -879,7 +887,7 @@ export const useStore = create<GoalTrackerState>()(
               for (const table of INSERT_ORDER) {
                 const items = insertsByTable[table];
                 if (items && items.length > 0) {
-                  const getCleanedPayload = (p: any) => {
+                  const getCleanedPayload = (p: Record<string, unknown>) => {
                     let cleaned = p;
                     if (table === 'tasks') {
                       const { dueDate, ...rest } = p;
@@ -896,7 +904,7 @@ export const useStore = create<GoalTrackerState>()(
                     const { error } = await client.from(table).insert(payloads);
                     if (error) throw error;
                     items.forEach(item => processedActionIds.add(item.actionId));
-                  } catch (err: any) {
+                  } catch (err: unknown) {
                     if (isNetworkError(err)) throw err;
                     console.warn(`Batch insert failed for table ${table}, falling back to individual inserts:`, err);
                     await fallbackInsertIndividual(table, items, getCleanedPayload);
@@ -904,7 +912,7 @@ export const useStore = create<GoalTrackerState>()(
                 }
               }
 
-            } catch (err: any) {
+            } catch (err: unknown) {
               if (isNetworkError(err)) {
                 networkErrorToThrow = err;
               } else {
@@ -929,8 +937,10 @@ export const useStore = create<GoalTrackerState>()(
               break;
             }
           }
-        } catch (err: any) {
-          console.warn(`Sync paused: network connection is currently unreachable (${err.message}). Will retry when connection stabilizes.`);
+        } catch (err: unknown) {
+          const errorObj = err as Record<string, unknown>;
+          const msg = typeof errorObj.message === 'string' ? errorObj.message : '';
+          console.warn(`Sync paused: network connection is currently unreachable (${msg}). Will retry when connection stabilizes.`);
         } finally {
           set({ isSyncing: false });
         }
