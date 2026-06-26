@@ -18,7 +18,11 @@ export default function AuthSection() {
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
       const hostname = window.location.hostname;
-      setIsLocalhost(hostname === 'localhost' || hostname === '127.0.0.1');
+      const isLocal = hostname === 'localhost' || hostname === '127.0.0.1';
+      const timer = setTimeout(() => {
+        setIsLocalhost(isLocal);
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, []);
 
